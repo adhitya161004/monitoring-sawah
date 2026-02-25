@@ -1,91 +1,70 @@
-<!DOCTYPE html>
-<html lang="id">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Monitoring Sawah Realtime</title>
+// ================= MQTT CONFIG =================
+const options = {
+    username: "monitoringsawahbyarnf",
+    password: "Gakkenek1",
+    protocol: "wss",
+};
 
-    <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+const client = mqtt.connect("wss://3bf57b9ff69e4d24ac2161a9955cac2d.s1.eu.hivemq.cloud:8884/mqtt", options);
 
-    <style>
-        body {
-            font-family: 'Segoe UI', Arial, sans-serif;
-            background: #f4f6f9;
-            margin: 0;
-            padding: 0;
-            text-align: center;
-        }
-        header {
-            background: #2f4156;
-            color: white;
-            padding: 20px;
-            font-size: 24px;
-            font-weight: bold;
-        }
-        .container {
-            display: flex;
-            justify-content: center;
-            flex-wrap: wrap;
-            margin-top: 20px;
-            gap: 15px;
-            padding: 10px;
-        }
-        .card {
-            background: white;
-            width: 150px;
-            padding: 20px;
-            border-radius: 12px;
-            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
-        }
-        .card h3 {
-            margin-bottom: 10px;
-            font-size: 14px;
-            color: #555;
-        }
-        .value {
-            font-size: 22px;
-            font-weight: bold;
-            color: #27ae60;
-        }
-        .chart-box {
-            width: 90%;
-            max-width: 800px;
-            margin: 30px auto;
-            background: white;
-            padding: 20px;
-            border-radius: 12px;
-            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
-        }
-    </style>
-</head>
-<body>
+// ================= CHART SETUP =================
+// Menghubungkan ke ID 'soilChart' di HTML
+const ctx = document.getElementById("soilChart").getContext("2d");
 
-    <header>🌾 Monitoring Sawah Realtime</header>
+const soilChart = new Chart(ctx, {
+    type: "line",
+    data: {
+        labels: [],
+        datasets: [{
+            label: "Soil Moisture (%)",
+            data: [],
+            borderColor: "#27ae60",
+            backgroundColor: "rgba(39, 174, 96, 0.1)",
+            borderWidth: 2,
+            fill: true,
+            tension: 0.3
+        }],
+    },
+    options: {
+        responsive: true,
+        animation: false,
+        scales: {
+            y: { min: 0, max: 100 },
+        },
+    },
+});
 
-    <div class="container">
-        <div class="card">
-            <h3>Soil Moisture</h3>
-            <div id="soil" class="value">- %</div>
-        </div>
-        <div class="card">
-            <h3>Tinggi Sawah</h3>
-            <div id="sawah" class="value">- cm</div>
-        </div>
-        <div class="card">
-            <h3>Tinggi Tambak</h3>
-            <div id="tambak" class="value">- m</div>
-        </div>
-        <div class="card">
-            <h3>Battery</h3>
-            <div id="battery" class="value">- %</div>
-        </div>
-    </div>
+// ================= CONNECT =================
+client.on("connect", function () {
+    console.log("Terhubung ke HiveMQ ✅");
+    client.subscribe("sawah/#");
+    client.subscribe("tambak/#");
+    client.subscribe("sistem/#");
+});
 
-    <div class="chart-box">
-        <canvas id="soilChart"></canvas>
-    </div>
+client.on("message", function (topic, message) {
+    let value = parseFloat(message.toString());
+    if (isNaN(value)) return; // Abaikan jika data bukan angka
 
-    <script src="app.js"></script>
-</body>
-</html>
+    console.log("Data masuk:", topic, value);
+
+    if (topic === "sawah/soil_moisture") {
+        document.getElementById("soil").innerText = value + " %";
+
+        const timeNow = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        soilChart.data.labels.push(timeNow);
+        soilChart.data.datasets[0].data.push(value);
+
+        if (soilChart.data.labels.length > 15) {
+            soilChart.data.labels.shift();
+            soilChart.data.datasets[0].data.shift();
+        }
+        soilChart.update();
+    }
+
+    if (topic === "sawah/tinggi_air") document.getElementById("sawah").innerText = value + " cm";
+    if (topic === "tambak/tinggi_air") document.getElementById("tambak").innerText = value + " m";
+    if (topic === "sistem/battery_percent") document.getElementById("battery").innerText = value + " %";
+});
+
+client.on("error", (err) => console.log("MQTT Error:", err));
