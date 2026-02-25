@@ -1,70 +1,184 @@
-// ================= MQTT CONFIG =================
-const options = {
-    username: "monitoringsawahbyarnf",
-    password: "Gakkenek1",
-    protocol: "wss",
-};
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Monitoring Sawah Realtime</title>
 
-const client = mqtt.connect("wss://3bf57b9ff69e4d24ac2161a9955cac2d.s1.eu.hivemq.cloud:8884/mqtt", options);
+    <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
-// ================= CHART SETUP =================
-// Menghubungkan ke ID 'soilChart' di HTML
-const ctx = document.getElementById("soilChart").getContext("2d");
-
-const soilChart = new Chart(ctx, {
-    type: "line",
-    data: {
-        labels: [],
-        datasets: [{
-            label: "Soil Moisture (%)",
-            data: [],
-            borderColor: "#27ae60",
-            backgroundColor: "rgba(39, 174, 96, 0.1)",
-            borderWidth: 2,
-            fill: true,
-            tension: 0.3
-        }],
-    },
-    options: {
-        responsive: true,
-        animation: false,
-        scales: {
-            y: { min: 0, max: 100 },
-        },
-    },
-});
-
-// ================= CONNECT =================
-client.on("connect", function () {
-    console.log("Terhubung ke HiveMQ ✅");
-    client.subscribe("sawah/#");
-    client.subscribe("tambak/#");
-    client.subscribe("sistem/#");
-});
-
-client.on("message", function (topic, message) {
-    let value = parseFloat(message.toString());
-    if (isNaN(value)) return; // Abaikan jika data bukan angka
-
-    console.log("Data masuk:", topic, value);
-
-    if (topic === "sawah/soil_moisture") {
-        document.getElementById("soil").innerText = value + " %";
-
-        const timeNow = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-        soilChart.data.labels.push(timeNow);
-        soilChart.data.datasets[0].data.push(value);
-
-        if (soilChart.data.labels.length > 15) {
-            soilChart.data.labels.shift();
-            soilChart.data.datasets[0].data.shift();
+    <style>
+        :root {
+            --primary: #2f4156;
+            --accent: #27ae60;
+            --bg: #f4f6f9;
         }
-        soilChart.update();
-    }
 
-    if (topic === "sawah/tinggi_air") document.getElementById("sawah").innerText = value + " cm";
-    if (topic === "tambak/tinggi_air") document.getElementById("tambak").innerText = value + " m";
-    if (topic === "sistem/battery_percent") document.getElementById("battery").innerText = value + " %";
-});
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: var(--bg);
+            margin: 0;
+            padding: 0;
+            color: #333;
+            text-align: center;
+        }
 
-client.on("error", (err) => console.log("MQTT Error:", err));
+        header {
+            background: var(--primary);
+            color: white;
+            padding: 25px;
+            font-size: 24px;
+            font-weight: bold;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+        }
+
+        .container {
+            display: flex;
+            justify-content: center;
+            flex-wrap: wrap;
+            gap: 15px;
+            padding: 20px;
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+
+        .card {
+            background: white;
+            flex: 1;
+            min-width: 150px;
+            padding: 20px;
+            border-radius: 15px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+        }
+
+        .card h3 {
+            margin: 0 0 10px 0;
+            font-size: 13px;
+            color: #7f8c8d;
+            text-transform: uppercase;
+        }
+
+        .value {
+            font-size: 28px;
+            font-weight: 800;
+            color: var(--accent);
+        }
+
+        .chart-box {
+            background: white;
+            max-width: 800px;
+            margin: 20px auto;
+            padding: 20px;
+            border-radius: 15px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+        }
+
+        .status {
+            font-size: 12px;
+            margin-top: 10px;
+            color: orange;
+        }
+    </style>
+</head>
+<body>
+
+    <header>🌾 Smart Farming Dashboard</header>
+    
+    <div id="mqtt-status" class="status">Menghubungkan ke server...</div>
+
+    <div class="container">
+        <div class="card">
+            <h3>Soil Moisture</h3>
+            <div id="soil" class="value">-- %</div>
+        </div>
+        <div class="card">
+            <h3>Tinggi Sawah</h3>
+            <div id="sawah" class="value">-- cm</div>
+        </div>
+        <div class="card">
+            <h3>Tinggi Tambak</h3>
+            <div id="tambak" class="value">-- m</div>
+        </div>
+        <div class="card">
+            <h3>Battery</h3>
+            <div id="battery" class="value">-- %</div>
+        </div>
+    </div>
+
+    <div class="chart-box">
+        <canvas id="soilChart"></canvas>
+    </div>
+
+    <script>
+        // ================= 1. KONFIGURASI MQTT =================
+        const options = {
+            username: "monitoringsawahbyarnf",
+            password: "Gakkenek1",
+            protocol: "wss",
+        };
+
+        const client = mqtt.connect("wss://3bf57b9ff69e4d24ac2161a9955cac2d.s1.eu.hivemq.cloud:8884/mqtt", options);
+
+        // ================= 2. KONFIGURASI GRAFIK =================
+        const ctx = document.getElementById("soilChart").getContext("2d");
+        const soilChart = new Chart(ctx, {
+            type: "line",
+            data: {
+                labels: [],
+                datasets: [{
+                    label: "Kelembapan Tanah (%)",
+                    data: [],
+                    borderColor: "#27ae60",
+                    backgroundColor: "rgba(39, 174, 96, 0.1)",
+                    fill: true,
+                    tension: 0.4
+                }]
+            },
+            options: {
+                responsive: true,
+                scales: { y: { min: 0, max: 100 } }
+            }
+        });
+
+        // ================= 3. LOGIKA KONEKSI =================
+        client.on("connect", () => {
+            document.getElementById("mqtt-status").innerText = "Terhubung ke HiveMQ ✅";
+            document.getElementById("mqtt-status").style.color = "green";
+            client.subscribe("sawah/#");
+            client.subscribe("tambak/#");
+            client.subscribe("sistem/#");
+        });
+
+        client.on("message", (topic, message) => {
+            const value = parseFloat(message.toString());
+            if (isNaN(value)) return;
+
+            console.log(topic, value);
+
+            if (topic === "sawah/soil_moisture") {
+                document.getElementById("soil").innerText = value + " %";
+                
+                // Update Grafik
+                const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                soilChart.data.labels.push(now);
+                soilChart.data.datasets[0].data.push(value);
+                if (soilChart.data.labels.length > 10) {
+                    soilChart.data.labels.shift();
+                    soilChart.data.datasets[0].data.shift();
+                }
+                soilChart.update();
+            }
+
+            if (topic === "sawah/tinggi_air") document.getElementById("sawah").innerText = value + " cm";
+            if (topic === "tambak/tinggi_air") document.getElementById("tambak").innerText = value + " m";
+            if (topic === "sistem/battery_percent") document.getElementById("battery").innerText = value + " %";
+        });
+
+        client.on("error", (err) => {
+            document.getElementById("mqtt-status").innerText = "Koneksi Gagal ❌";
+            document.getElementById("mqtt-status").style.color = "red";
+        });
+    </script>
+</body>
+</html>
