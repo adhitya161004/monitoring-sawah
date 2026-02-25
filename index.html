@@ -1,0 +1,75 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <title>Monitoring Sawah</title>
+    <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <style>
+      body {
+        font-family: Arial;
+        background: #f4f6f9;
+        text-align: center;
+      }
+
+      h1 {
+        background: #2c3e50;
+        color: white;
+        padding: 15px;
+      }
+
+      .container {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 20px;
+        padding: 20px;
+      }
+
+      .card {
+        background: white;
+        padding: 20px;
+        border-radius: 10px;
+        box-shadow: 0 3px 8px rgba(0, 0, 0, 0.2);
+      }
+
+      .value {
+        font-size: 28px;
+        font-weight: bold;
+        color: green;
+      }
+    </style>
+  </head>
+
+  <body>
+    <h1>🌾 Monitoring Sawah Realtime</h1>
+
+    <div class="container">
+      <div class="card">
+        <h3>Soil Moisture</h3>
+        <div class="value" id="soil">-</div>
+      </div>
+
+      <div class="card">
+        <h3>Tinggi Sawah (cm)</h3>
+        <div class="value" id="sawah">-</div>
+      </div>
+
+      <div class="card">
+        <h3>Tinggi Tambak (m)</h3>
+        <div class="value" id="tambak">-</div>
+      </div>
+
+      <div class="card">
+        <h3>Battery (%)</h3>
+        <div class="value" id="battery">-</div>
+      </div>
+    </div>
+
+    <div style="width: 80%; margin: auto">
+      <canvas id="soilChart"></canvas>
+    </div>
+
+    <script src="app.js"></script>
+  </body>
+</html>
