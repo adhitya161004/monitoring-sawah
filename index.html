@@ -1,169 +1,60 @@
 <!doctype html>
 <html lang="id">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Smart Farming Dashboard</title>
-
-    <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
-    <style>
-      * {
-        margin: 0;
-        padding: 0;
-        box-sizing: border-box;
-      }
-
-      body {
-        font-family: "Segoe UI", sans-serif;
-        background: linear-gradient(135deg, #1e3c72, #2a5298);
-        color: white;
-        text-align: center;
-        min-height: 100vh;
-      }
-
-      header {
-        padding: 25px;
-        font-size: 24px;
-        font-weight: bold;
-      }
-
-      .glass {
-        background: rgba(255, 255, 255, 0.1);
-        backdrop-filter: blur(15px);
-        border-radius: 20px;
-        padding: 20px;
-        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
-      }
-
-      .container {
-        display: flex;
-        flex-wrap: wrap;
-        justify-content: center;
-        gap: 20px;
-        padding: 20px;
-      }
-
-      .card {
-        width: 200px;
-        transition: 0.3s;
-      }
-
-      .card:hover {
-        transform: translateY(-5px);
-      }
-
-      .value {
-        font-size: 28px;
-        font-weight: bold;
-        margin-top: 10px;
-      }
-
-      .status-led {
-        width: 12px;
-        height: 12px;
-        border-radius: 50%;
-        display: inline-block;
-        margin-right: 5px;
-      }
-
-      .green { background: #2ecc71; }
-      .red { background: #e74c3c; }
-      .orange { background: #f39c12; }
-
-      button {
-        padding: 8px 15px;
-        border: none;
-        border-radius: 8px;
-        cursor: pointer;
-        margin: 5px;
-        font-weight: bold;
-        transition: 0.2s;
-      }
-
-      button:hover {
-        transform: scale(1.05);
-      }
-
-      .btn-auto { background: #2ecc71; color: white; }
-      .btn-manual { background: #e74c3c; color: white; }
-      .btn-blue { background: #3498db; color: white; }
-
-      input {
-        padding: 8px;
-        border-radius: 8px;
-        border: none;
-        width: 80px;
-        text-align: center;
-      }
-
-      .chart-box {
-        max-width: 800px;
-        margin: 20px auto;
-      }
-    </style>
-  </head>
-
-  <body>
-    <header>🌾 Smart Farming System</header>
-
-    <div id="mqtt-status" class="glass" style="margin: 10px auto; width: 250px">
-      <span class="status-led orange" id="led"></span>
-      <span id="status-text">Menghubungkan...</span>
-    </div>
-
-    <div class="container">
-      <div class="card glass">
-        <h3>Soil Moisture</h3>
-        <div id="soil" class="value">-- %</div>
-      </div>
-
-      <div class="card glass">
-        <h3>Tinggi Sawah</h3>
-        <div id="sawah" class="value">-- cm</div>
-      </div>
-
-      <div class="card glass">
-        <h3>Tinggi Tambak</h3>
-        <div id="tambak" class="value">-- cm</div>
-      </div>
-    </div>
-
-    <div class="glass" style="width: 300px; margin: 20px auto">
-      <h3>Mode Sistem</h3>
-      <p id="mode-status" style="margin:10px 0; font-weight:bold; color:#f1c40f;">Mode: -</p>
-      <button class="btn-auto" onclick="setMode('AUTO')">AUTO</button>
-      <button class="btn-manual" onclick="setMode('MANUAL')">MANUAL</button>
-    </div>
-
-    <div class="glass" style="width: 300px; margin: 20px auto">
-      <h3>Target Tinggi Sawah</h3>
-      <input type="number" id="settingInput" min="5" max="30" value="20" />
-      <button class="btn-blue" onclick="setSetting()">Kirim</button>
-      <p style="margin-top:10px; font-size:14px;">Target saat ini: <span id="target-status" style="font-weight:bold;">-</span> cm</p>
-    </div>
-
-    <div class="glass" style="width: 350px; margin: 20px auto">
-      <h3>Manual Control</h3>
-      <p style="font-size:12px; margin-bottom:10px;">(Hanya berfungsi di Mode MANUAL)</p>
-      
-      <button class="btn-blue" onclick="sendManual('pompa1', 'ON')">P1 ON (Isi Sawah)</button>
-      <button class="btn-manual" onclick="sendManual('pompa1', 'OFF')">P1 OFF</button>
-      <br /><br />
-      
-      <button class="btn-blue" onclick="sendManual('pompa2', 'ON')">P2 ON (Isi Tambak)</button>
-      <button class="btn-manual" onclick="sendManual('pompa2', 'OFF')">P2 OFF</button>
-      <br /><br />
-      
-      <button class="btn-auto" onclick="sendManual('aktuator', 'BUKA')">AKT BUKA (Buang)</button>
-      <button class="btn-manual" onclick="sendManual('aktuator', 'TUTUP')">AKT TUTUP</button>
-    </div>
-
-    <div class="chart-box glass">
-      <canvas id="soilChart"></canvas>
-    </div>
-
-    <script src="app.js"></script>
-  </body>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Smart Farming Dashboard</title>
+  <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: "Segoe UI", sans-serif; background: linear-gradient(135deg, #1e3c72, #2a5298); color: white; text-align: center; min-height: 100vh; }
+    header { padding: 25px; font-size: 24px; font-weight: bold; }
+    .glass { background: rgba(255, 255, 255, 0.1); backdrop-filter: blur(15px); border-radius: 20px; padding: 20px; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3); }
+    .container { display: flex; flex-wrap: wrap; justify-content: center; gap: 20px; padding: 20px; }
+    .card { width: 200px; transition: 0.3s; }
+    .card:hover { transform: translateY(-5px); }
+    .value { font-size: 28px; font-weight: bold; margin-top: 10px; }
+    .status-led { width: 12px; height: 12px; border-radius: 50%; display: inline-block; margin-right: 5px; }
+    .green { background: #2ecc71; } .red { background: #e74c3c; } .orange { background: #f39c12; }
+    button { padding: 8px 15px; border: none; border-radius: 8px; cursor: pointer; margin: 5px; font-weight: bold; transition: 0.2s; }
+    button:hover { transform: scale(1.05); }
+    .btn-auto { background: #2ecc71; color: white; } .btn-manual { background: #e74c3c; color: white; } .btn-blue { background: #3498db; color: white; }
+    input { padding: 8px; border-radius: 8px; border: none; width: 80px; text-align: center; }
+    .chart-box { max-width: 800px; margin: 20px auto; }
+  </style>
+</head>
+<body>
+  <header>🌾 Smart Farming System</header>
+  <div id="mqtt-status" class="glass" style="margin: 10px auto; width: 250px">
+    <span class="status-led orange" id="led"></span><span id="status-text">Menghubungkan...</span>
+  </div>
+  <div class="container">
+    <div class="card glass"><h3>Soil Moisture</h3><div id="soil" class="value">-- %</div></div>
+    <div class="card glass"><h3>Tinggi Sawah</h3><div id="sawah" class="value">-- cm</div></div>
+    <div class="card glass"><h3>Tinggi Tambak</h3><div id="tambak" class="value">-- cm</div></div>
+    <div class="card glass"><h3>Battery</h3><div id="battery" class="value">-- %</div></div>
+  </div>
+  <div class="glass" style="width: 300px; margin: 20px auto">
+    <h3>Mode Sistem</h3><p id="mode-status" style="margin:10px 0; font-weight:bold; color:#f1c40f;">Mode: -</p>
+    <button class="btn-auto" onclick="setMode('AUTO')">AUTO</button><button class="btn-manual" onclick="setMode('MANUAL')">MANUAL</button>
+  </div>
+  <div class="glass" style="width: 300px; margin: 20px auto">
+    <h3>Target Tinggi Sawah</h3>
+    <input type="number" id="settingInput" min="5" max="30" value="20" />
+    <button class="btn-blue" onclick="setSetting()">Kirim</button>
+    <p style="margin-top:10px; font-size:14px;">Target saat ini: <span id="target-status" style="font-weight:bold;">-</span> cm</p>
+  </div>
+  <div class="glass" style="width: 350px; margin: 20px auto">
+    <h3>Manual Control</h3><p style="font-size:12px; margin-bottom:10px;">(Hanya Mode MANUAL)</p>
+    <button class="btn-blue" onclick="sendManual('pompa1', 'ON')">P1 ON</button>
+    <button class="btn-manual" onclick="sendManual('pompa1', 'OFF')">P1 OFF</button><br /><br />
+    <button class="btn-blue" onclick="sendManual('pompa2', 'ON')">P2 ON</button>
+    <button class="btn-manual" onclick="sendManual('pompa2', 'OFF')">P2 OFF</button><br /><br />
+    <button class="btn-auto" onclick="sendManual('aktuator', 'BUKA')">AKT BUKA</button>
+    <button class="btn-manual" onclick="sendManual('aktuator', 'TUTUP')">AKT TUTUP</button>
+  </div>
+  <div class="chart-box glass"><canvas id="soilChart"></canvas></div>
+  <script src="app.js"></script>
+</body>
 </html>
