@@ -68,15 +68,9 @@
         margin-right: 5px;
       }
 
-      .green {
-        background: #2ecc71;
-      }
-      .red {
-        background: #e74c3c;
-      }
-      .orange {
-        background: #f39c12;
-      }
+      .green { background: #2ecc71; }
+      .red { background: #e74c3c; }
+      .orange { background: #f39c12; }
 
       button {
         padding: 8px 15px;
@@ -92,18 +86,9 @@
         transform: scale(1.05);
       }
 
-      .btn-auto {
-        background: #2ecc71;
-        color: white;
-      }
-      .btn-manual {
-        background: #e74c3c;
-        color: white;
-      }
-      .btn-blue {
-        background: #3498db;
-        color: white;
-      }
+      .btn-auto { background: #2ecc71; color: white; }
+      .btn-manual { background: #e74c3c; color: white; }
+      .btn-blue { background: #3498db; color: white; }
 
       input {
         padding: 8px;
@@ -143,36 +128,36 @@
         <h3>Tinggi Tambak</h3>
         <div id="tambak" class="value">-- cm</div>
       </div>
-
-      <div class="card glass">
-        <h3>Battery</h3>
-        <div id="battery" class="value">-- %</div>
-      </div>
     </div>
 
     <div class="glass" style="width: 300px; margin: 20px auto">
       <h3>Mode Sistem</h3>
-      <p id="mode-status">Mode: -</p>
+      <p id="mode-status" style="margin:10px 0; font-weight:bold; color:#f1c40f;">Mode: -</p>
       <button class="btn-auto" onclick="setMode('AUTO')">AUTO</button>
       <button class="btn-manual" onclick="setMode('MANUAL')">MANUAL</button>
     </div>
 
-    <div class="glass" style="width: 350px; margin: 20px auto">
-      <h3>Manual Control</h3>
-      <button class="btn-blue" onclick="sendManual('pompa1', 'ON')">Pompa1 ON</button>
-      <button class="btn-blue" onclick="sendManual('pompa2', 'ON')">Pompa2 ON</button>
-      <br />
-      <button class="btn-manual" onclick="sendManual('pompa1', 'OFF')">OFF</button>
-      <button class="btn-manual" onclick="sendManual('pompa2', 'OFF')">OFF</button>
-      <br /><br />
-      <button class="btn-blue" onclick="sendManual('aktuator', 'BUKA')">BUKA</button>
-      <button class="btn-manual" onclick="sendManual('aktuator', 'TUTUP')">TUTUP</button>
-    </div>
-
     <div class="glass" style="width: 300px; margin: 20px auto">
-      <h3>Setting Tinggi Sawah</h3>
+      <h3>Target Tinggi Sawah</h3>
       <input type="number" id="settingInput" min="5" max="30" value="20" />
       <button class="btn-blue" onclick="setSetting()">Kirim</button>
+      <p style="margin-top:10px; font-size:14px;">Target saat ini: <span id="target-status" style="font-weight:bold;">-</span> cm</p>
+    </div>
+
+    <div class="glass" style="width: 350px; margin: 20px auto">
+      <h3>Manual Control</h3>
+      <p style="font-size:12px; margin-bottom:10px;">(Hanya berfungsi di Mode MANUAL)</p>
+      
+      <button class="btn-blue" onclick="sendManual('pompa1', 'ON')">P1 ON (Isi Sawah)</button>
+      <button class="btn-manual" onclick="sendManual('pompa1', 'OFF')">P1 OFF</button>
+      <br /><br />
+      
+      <button class="btn-blue" onclick="sendManual('pompa2', 'ON')">P2 ON (Isi Tambak)</button>
+      <button class="btn-manual" onclick="sendManual('pompa2', 'OFF')">P2 OFF</button>
+      <br /><br />
+      
+      <button class="btn-auto" onclick="sendManual('aktuator', 'BUKA')">AKT BUKA (Buang)</button>
+      <button class="btn-manual" onclick="sendManual('aktuator', 'TUTUP')">AKT TUTUP</button>
     </div>
 
     <div class="chart-box glass">
