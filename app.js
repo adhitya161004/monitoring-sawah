@@ -30,19 +30,11 @@ const soilChart = new Chart(ctx, {
     responsive: true,
     animation: false,
     plugins: {
-      legend: {
-        labels: { color: "white" },
-      },
+      legend: { labels: { color: "white" } },
     },
     scales: {
-      y: {
-        min: 0,
-        max: 100,
-        ticks: { color: "white" },
-      },
-      x: {
-        ticks: { color: "white" },
-      },
+      y: { min: 0, max: 100, ticks: { color: "white" } },
+      x: { ticks: { color: "white" } },
     },
   },
 });
@@ -54,80 +46,64 @@ client.on("connect", function () {
   document.getElementById("status-text").innerText = "Terhubung";
   document.getElementById("led").className = "status-led green";
 
-  // Subscribe ke topik utama yang dikirim oleh ESP32
+  // Subscribe ke topik-topik penting
   client.subscribe("sawah/data");
-  
-  // Subscribe ke topik kontrol lainnya
-  client.subscribe("sistem/#");
-  client.subscribe("manual/#");
+  client.subscribe("sistem/mode");
+  client.subscribe("sistem/setting_tinggi");
 });
 
 // ================= MESSAGE HANDLER =================
 client.on("message", function (topic, message) {
   let rawValue = message.toString();
-  console.log("Data masuk:", topic, rawValue);
+  console.log("Menerima dari [" + topic + "]: " + rawValue);
 
-  // Jika data masuk dari ESP32 (Format JSON)
+  // 1. TERIMA DATA SENSOR DARI ESP32
   if (topic === "sawah/data") {
     try {
-      // Parsing JSON (mengubah string JSON menjadi object)
       let data = JSON.parse(rawValue);
 
-      // 1. Update Kelembaban Tanah (Soil Moisture)
+      // Update Angka di Kartu
+      if (data.soil !== undefined) document.getElementById("soil").innerText = data.soil + " %";
+      if (data.sawah !== undefined) document.getElementById("sawah").innerText = data.sawah.toFixed(1) + " cm";
+      if (data.tambak !== undefined) document.getElementById("tambak").innerText = data.tambak.toFixed(1) + " cm";
+
+      // Update Grafik Soil
       if (data.soil !== undefined) {
-        document.getElementById("soil").innerText = data.soil + " %";
-
-        const timeNow = new Date().toLocaleTimeString([], {
-          hour: "2-digit",
-          minute: "2-digit",
-        });
-
+        const timeNow = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
         soilChart.data.labels.push(timeNow);
         soilChart.data.datasets[0].data.push(data.soil);
 
-        // Maksimal 15 titik data di grafik
+        // Batasi maksimal 15 titik di grafik
         if (soilChart.data.labels.length > 15) {
           soilChart.data.labels.shift();
           soilChart.data.datasets[0].data.shift();
         }
-
         soilChart.update();
       }
-
-      // 2. Update Tinggi Sawah atau Tambak tergantung identitas "sensor"
-      if (data.sensor === "sawah" && data.tinggi !== undefined) {
-        document.getElementById("sawah").innerText = data.tinggi.toFixed(1) + " cm";
-      } else if (data.sensor === "tambak" && data.tinggi !== undefined) {
-        document.getElementById("tambak").innerText = data.tinggi.toFixed(1) + " cm";
-      }
-
     } catch (error) {
-      console.error("Gagal membaca JSON dari ESP32:", error);
+      console.error("Gagal membaca JSON", error);
     }
   }
 
-  // ================= DATA STATUS LAINNYA =================
-  if (topic === "sistem/battery_percent") {
-    let batValue = parseFloat(rawValue);
-    if(!isNaN(batValue)){
-        document.getElementById("battery").innerText = batValue + " %";
-    }
-  }
-
+  // 2. SINKRONISASI STATUS MODE (JIKA DIUBAH DARI WEB LAIN / PHP)
   if (topic === "sistem/mode") {
     document.getElementById("mode-status").innerText = "Mode: " + rawValue;
   }
+
+  // 3. SINKRONISASI STATUS TARGET SAWAH
+  if (topic === "sistem/setting_tinggi") {
+    document.getElementById("target-status").innerText = rawValue;
+  }
 });
 
-// ================= ERROR =================
+// ================= ERROR HANDLING =================
 client.on("error", function (err) {
   console.log("MQTT Error:", err);
-  document.getElementById("status-text").innerText = "Koneksi Gagal";
+  document.getElementById("status-text").innerText = "Koneksi Terputus";
   document.getElementById("led").className = "status-led red";
 });
 
-// ================= CONTROL FUNCTIONS =================
-// Disematkan pada 'window' agar bisa dipanggil oleh event onclick dari HTML
+// ================= FUNGSI TOMBOL (KIRIM PERINTAH) =================
 window.setMode = function(mode) {
   client.publish("sistem/mode", mode);
 };
@@ -141,6 +117,6 @@ window.setSetting = function() {
   if (value >= 5 && value <= 30) {
     client.publish("sistem/setting_tinggi", value);
   } else {
-    alert("Setting harus antara 5 - 30 cm");
+    alert("Setting tinggi sawah harus di antara 5 - 30 cm");
   }
 };
