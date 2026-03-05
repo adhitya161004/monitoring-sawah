@@ -54,8 +54,10 @@ client.on("connect", function () {
   document.getElementById("status-text").innerText = "Terhubung";
   document.getElementById("led").className = "status-led green";
 
-  client.subscribe("sawah/#");
-  client.subscribe("tambak/#");
+  // Subscribe ke topik utama yang dikirim oleh ESP32
+  client.subscribe("sawah/data");
+  
+  // Subscribe ke topik kontrol lainnya
   client.subscribe("sistem/#");
   client.subscribe("manual/#");
 });
@@ -63,43 +65,55 @@ client.on("connect", function () {
 // ================= MESSAGE HANDLER =================
 client.on("message", function (topic, message) {
   let rawValue = message.toString();
-  let value = parseFloat(rawValue);
-
   console.log("Data masuk:", topic, rawValue);
 
-  // ================= SENSOR DATA =================
-  if (topic === "sawah/soil_moisture" && !isNaN(value)) {
-    document.getElementById("soil").innerText = value + " %";
+  // Jika data masuk dari ESP32 (Format JSON)
+  if (topic === "sawah/data") {
+    try {
+      // Parsing JSON (mengubah string JSON menjadi object)
+      let data = JSON.parse(rawValue);
 
-    const timeNow = new Date().toLocaleTimeString([], {
-      hour: "2-digit",
-      minute: "2-digit",
-    });
+      // 1. Update Kelembaban Tanah (Soil Moisture)
+      if (data.soil !== undefined) {
+        document.getElementById("soil").innerText = data.soil + " %";
 
-    soilChart.data.labels.push(timeNow);
-    soilChart.data.datasets[0].data.push(value);
+        const timeNow = new Date().toLocaleTimeString([], {
+          hour: "2-digit",
+          minute: "2-digit",
+        });
 
-    if (soilChart.data.labels.length > 15) {
-      soilChart.data.labels.shift();
-      soilChart.data.datasets[0].data.shift();
+        soilChart.data.labels.push(timeNow);
+        soilChart.data.datasets[0].data.push(data.soil);
+
+        // Maksimal 15 titik data di grafik
+        if (soilChart.data.labels.length > 15) {
+          soilChart.data.labels.shift();
+          soilChart.data.datasets[0].data.shift();
+        }
+
+        soilChart.update();
+      }
+
+      // 2. Update Tinggi Sawah atau Tambak tergantung identitas "sensor"
+      if (data.sensor === "sawah" && data.tinggi !== undefined) {
+        document.getElementById("sawah").innerText = data.tinggi.toFixed(1) + " cm";
+      } else if (data.sensor === "tambak" && data.tinggi !== undefined) {
+        document.getElementById("tambak").innerText = data.tinggi.toFixed(1) + " cm";
+      }
+
+    } catch (error) {
+      console.error("Gagal membaca JSON dari ESP32:", error);
     }
-
-    soilChart.update();
   }
 
-  if (topic === "sawah/tinggi_air" && !isNaN(value)) {
-    document.getElementById("sawah").innerText = value + " cm";
+  // ================= DATA STATUS LAINNYA =================
+  if (topic === "sistem/battery_percent") {
+    let batValue = parseFloat(rawValue);
+    if(!isNaN(batValue)){
+        document.getElementById("battery").innerText = batValue + " %";
+    }
   }
 
-  if (topic === "tambak/tinggi_air" && !isNaN(value)) {
-    document.getElementById("tambak").innerText = value + " cm";
-  }
-
-  if (topic === "sistem/battery_percent" && !isNaN(value)) {
-    document.getElementById("battery").innerText = value + " %";
-  }
-
-  // ================= MODE UPDATE =================
   if (topic === "sistem/mode") {
     document.getElementById("mode-status").innerText = "Mode: " + rawValue;
   }
@@ -113,19 +127,20 @@ client.on("error", function (err) {
 });
 
 // ================= CONTROL FUNCTIONS =================
-function setMode(mode) {
+// Disematkan pada 'window' agar bisa dipanggil oleh event onclick dari HTML
+window.setMode = function(mode) {
   client.publish("sistem/mode", mode);
-}
+};
 
-function sendManual(device, state) {
+window.sendManual = function(device, state) {
   client.publish("manual/" + device, state);
-}
+};
 
-function setSetting() {
+window.setSetting = function() {
   let value = document.getElementById("settingInput").value;
   if (value >= 5 && value <= 30) {
     client.publish("sistem/setting_tinggi", value);
   } else {
     alert("Setting harus antara 5 - 30 cm");
   }
-}
+};
