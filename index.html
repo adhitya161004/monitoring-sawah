@@ -3,83 +3,220 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Smart Farming Dashboard</title>
+  <title>Monitoring Sawah by ARNF</title>
+  
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
   <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  
   <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: "Segoe UI", sans-serif; background: linear-gradient(135deg, #1e3c72, #2a5298); color: white; text-align: center; min-height: 100vh; padding-bottom: 50px; }
-    header { padding: 25px; font-size: 24px; font-weight: bold; }
-    .glass { background: rgba(255, 255, 255, 0.1); backdrop-filter: blur(15px); border-radius: 20px; padding: 20px; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3); }
-    .container { display: flex; flex-wrap: wrap; justify-content: center; gap: 20px; padding: 20px; }
-    .card { width: 200px; transition: 0.3s; }
-    .card:hover { transform: translateY(-5px); }
-    .value { font-size: 28px; font-weight: bold; margin-top: 10px; }
-    .status-led { width: 12px; height: 12px; border-radius: 50%; display: inline-block; margin-right: 5px; }
-    .green { background: #2ecc71; } .red { background: #e74c3c; } .orange { background: #f39c12; }
-    button { padding: 8px 15px; border: none; border-radius: 8px; cursor: pointer; margin: 5px; font-weight: bold; transition: 0.2s; }
-    button:hover { transform: scale(1.05); }
-    .btn-auto { background: #2ecc71; color: white; } .btn-manual { background: #e74c3c; color: white; } .btn-blue { background: #3498db; color: white; }
-    input { padding: 8px; border-radius: 8px; border: none; width: 80px; text-align: center; }
+    /* VARIABEL WARNA (TEMA BIRU & KUNING ELEGAN) */
+    :root {
+      --bg-main: #0a192f;
+      --glass-bg: rgba(255, 255, 255, 0.05);
+      --glass-border: rgba(255, 255, 255, 0.1);
+      --text-main: #e2e8f0;
+      --text-muted: #94a3b8;
+      --accent-yellow: #fbbf24;
+      --accent-blue: #3b82f6;
+      --status-on: #10b981;
+      --status-off: #ef4444;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Poppins', sans-serif; }
     
-    /* Layout untuk Grafik agar sejajar di layar besar */
-    .chart-container { display: flex; flex-wrap: wrap; justify-content: center; gap: 20px; padding: 20px; }
-    .chart-box { flex: 1; min-width: 300px; max-width: 450px; }
+    body {
+      background: radial-gradient(circle at top right, #112240, var(--bg-main));
+      color: var(--text-main);
+      min-height: 100vh;
+      padding: 20px;
+    }
+
+    /* HEADER */
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 30px;
+      padding-bottom: 15px;
+      border-bottom: 1px solid var(--glass-border);
+    }
+    .title-wrapper h1 { font-size: 24px; color: var(--accent-yellow); font-weight: 700; }
+    .title-wrapper i { color: #10b981; margin-right: 8px; }
     
-    /* Teks Status Perangkat */
-    .device-status { font-size: 18px; margin: 8px 0; font-weight: 500; }
-    .device-val { font-weight: bold; color: #f1c40f; padding: 2px 10px; background: rgba(0,0,0,0.2); border-radius: 5px; }
+    .status-badge {
+      background: rgba(16, 185, 129, 0.2);
+      color: #10b981;
+      padding: 8px 16px;
+      border-radius: 20px;
+      font-size: 14px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .status-badge.offline { background: rgba(239, 68, 68, 0.2); color: #ef4444; }
+
+    /* KOMPONEN KACA (GLASSMORPHISM) */
+    .glass-card {
+      background: var(--glass-bg);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      border: 1px solid var(--glass-border);
+      border-radius: 16px;
+      padding: 20px;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+
+    /* GRID LAYOUT UTAMA */
+    .dashboard-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 20px;
+      margin-bottom: 20px;
+    }
+
+    /* KARTU SENSOR */
+    .sensor-card { text-align: center; }
+    .sensor-title { font-size: 14px; color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 15px; }
+    .sensor-icon { font-size: 40px; margin-bottom: 10px; color: var(--accent-blue); }
+    .sensor-icon.soil { color: #10b981; }
+    .sensor-icon.batt { color: var(--text-main); }
+    .sensor-value { font-size: 36px; font-weight: 700; color: var(--accent-yellow); }
+
+    /* KONTROL PANEL & SLIDER */
+    .control-grid {
+      display: grid;
+      grid-template-columns: 1fr 2fr;
+      gap: 20px;
+      margin-bottom: 20px;
+    }
+    @media (max-width: 768px) { .control-grid { grid-template-columns: 1fr; } }
+
+    .control-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+    .control-row span { font-size: 16px; font-weight: 600; }
+    
+    .btn-group { display: flex; gap: 5px; }
+    button {
+      border: none; padding: 8px 15px; border-radius: 8px; font-weight: 600; cursor: pointer; transition: 0.3s;
+      background: rgba(255, 255, 255, 0.1); color: var(--text-main);
+    }
+    button:hover { background: rgba(255, 255, 255, 0.2); }
+    button.active-on { background: var(--status-on); color: white; box-shadow: 0 0 10px rgba(16, 185, 129, 0.4); }
+    button.active-off { background: var(--status-off); color: white; }
+
+    /* RANGE SLIDER */
+    .slider-container { margin: 25px 0; display: flex; align-items: center; gap: 15px; }
+    input[type=range] { flex: 1; accent-color: var(--accent-yellow); cursor: pointer; }
+    .target-val { font-size: 24px; font-weight: bold; color: var(--accent-yellow); min-width: 80px; text-align: right; }
+    .btn-kirim { background: var(--accent-blue); color: white; padding: 10px 20px; font-size: 16px; width: 100%; margin-top: 10px; }
+    .btn-kirim:hover { background: #2563eb; }
+
+    /* GRAFIK */
+    .chart-section { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; }
+    .chart-box { height: 250px; }
+    .section-title { font-size: 18px; font-weight: 600; color: var(--accent-yellow); margin-bottom: 15px; display: flex; align-items: center; gap: 10px; }
   </style>
 </head>
 <body>
-  <header>🌾 Smart Farming System</header>
-  
-  <div id="mqtt-status" class="glass" style="margin: 10px auto; width: 250px">
-    <span class="status-led orange" id="led"></span><span id="status-text">Menghubungkan...</span>
-  </div>
 
-  <div class="container">
-    <div class="card glass"><h3>Soil Moisture</h3><div id="soil" class="value">-- %</div></div>
-    <div class="card glass"><h3>Tinggi Sawah</h3><div id="sawah" class="value">-- cm</div></div>
-    <div class="card glass"><h3>Tinggi Tambak</h3><div id="tambak" class="value">-- cm</div></div>
-    <div class="card glass"><h3>Battery</h3><div id="battery" class="value">-- %</div></div>
-  </div>
-
-  <div class="container">
-    <div class="glass" style="width: 300px;">
-      <h3>Real-time Status</h3><hr style="margin: 10px 0; opacity: 0.3;">
-      <p class="device-status">Pompa 1: <span id="status-p1" class="device-val">--</span></p>
-      <p class="device-status">Pompa 2: <span id="status-p2" class="device-val">--</span></p>
-      <p class="device-status">Aktuator: <span id="status-akt" class="device-val">--</span></p>
+  <header>
+    <div class="title-wrapper">
+      <h1><i class="fa-solid fa-wheat-awn"></i> Monitoring Sawah by ARNF</h1>
     </div>
-
-    <div class="glass" style="width: 300px;">
-      <h3>Mode Sistem</h3><p id="mode-status" style="margin:10px 0; font-weight:bold; color:#f1c40f;">Mode: -</p>
-      <button class="btn-auto" onclick="setMode('AUTO')">AUTO</button>
-      <button class="btn-manual" onclick="setMode('MANUAL')">MANUAL</button>
-      <hr style="margin: 15px 0; opacity: 0.3;">
-      <h3>Target Tinggi Sawah</h3>
-      <input type="number" id="settingInput" min="5" max="30" value="20" />
-      <button class="btn-blue" onclick="setSetting()">Kirim</button>
-      <p style="margin-top:10px; font-size:14px;">Target saat ini: <span id="target-status" style="font-weight:bold;">-</span> cm</p>
+    <div class="status-badge offline" id="conn-status">
+      <i class="fa-solid fa-wifi"></i> <span id="status-text">Menghubungkan...</span>
     </div>
+  </header>
 
-    <div class="glass" style="width: 350px;">
-      <h3>Manual Control</h3><p style="font-size:12px; margin-bottom:10px; color:#bdc3c7;">(Hanya berfungsi di Mode MANUAL)</p>
-      <button class="btn-blue" onclick="sendManual('pompa1', 'ON')">P1 ON</button>
-      <button class="btn-manual" onclick="sendManual('pompa1', 'OFF')">P1 OFF</button><br /><br />
-      <button class="btn-blue" onclick="sendManual('pompa2', 'ON')">P2 ON</button>
-      <button class="btn-manual" onclick="sendManual('pompa2', 'OFF')">P2 OFF</button><br /><br />
-      <button class="btn-auto" onclick="sendManual('aktuator', 'BUKA')">AKT BUKA</button>
-      <button class="btn-manual" onclick="sendManual('aktuator', 'TUTUP')">AKT TUTUP</button>
+  <div class="dashboard-grid">
+    <div class="glass-card sensor-card">
+      <div class="sensor-title">Kelembapan Tanah</div>
+      <div class="sensor-icon soil"><i class="fa-solid fa-droplet"></i></div>
+      <div class="sensor-value" id="soil">-- %</div>
+    </div>
+    <div class="glass-card sensor-card">
+      <div class="sensor-title">Tinggi Sawah</div>
+      <div class="sensor-icon"><i class="fa-solid fa-water"></i></div>
+      <div class="sensor-value" id="sawah">-- cm</div>
+    </div>
+    <div class="glass-card sensor-card">
+      <div class="sensor-title">Tinggi Tambak</div>
+      <div class="sensor-icon"><i class="fa-solid fa-water"></i></div>
+      <div class="sensor-value" id="tambak">-- cm</div>
+    </div>
+    <div class="glass-card sensor-card">
+      <div class="sensor-title">Baterai Sistem</div>
+      <div class="sensor-icon batt"><i class="fa-solid fa-battery-half"></i></div>
+      <div class="sensor-value" id="battery">-- %</div>
     </div>
   </div>
 
-  <h3 style="margin-top: 30px;">Grafik Monitoring</h3>
-  <div class="chart-container">
-    <div class="chart-box glass"><canvas id="soilChart"></canvas></div>
-    <div class="chart-box glass"><canvas id="sawahChart"></canvas></div>
-    <div class="chart-box glass"><canvas id="tambakChart"></canvas></div>
+  <div class="control-grid">
+    
+    <div class="glass-card">
+      <div class="section-title"><i class="fa-solid fa-sliders"></i> Kontrol Manual</div>
+      <div class="control-row" style="border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom:15px; margin-bottom:15px;">
+        <span style="color: var(--accent-yellow);">Mode Sistem</span>
+        <div class="btn-group">
+          <button id="btn-auto" onclick="setMode('AUTO')">OTOMATIS</button>
+          <button id="btn-manual" onclick="setMode('MANUAL')">MANUAL</button>
+        </div>
+      </div>
+      <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 10px;">*Tombol di bawah hanya aktif pada mode MANUAL</p>
+      
+      <div class="control-row">
+        <span><i class="fa-solid fa-pump-water" style="color:#3b82f6; margin-right:8px;"></i> Pompa 1</span>
+        <div class="btn-group">
+          <button id="btn-p1-on" onclick="sendManual('pompa1', 'ON')">ON</button>
+          <button id="btn-p1-off" onclick="sendManual('pompa1', 'OFF')">OFF</button>
+        </div>
+      </div>
+      <div class="control-row">
+        <span><i class="fa-solid fa-pump-water" style="color:#3b82f6; margin-right:8px;"></i> Pompa 2</span>
+        <div class="btn-group">
+          <button id="btn-p2-on" onclick="sendManual('pompa2', 'ON')">ON</button>
+          <button id="btn-p2-off" onclick="sendManual('pompa2', 'OFF')">OFF</button>
+        </div>
+      </div>
+      <div class="control-row">
+        <span><i class="fa-solid fa-door-open" style="color:#fbbf24; margin-right:8px;"></i> Aktuator</span>
+        <div class="btn-group">
+          <button id="btn-akt-buka" onclick="sendManual('aktuator', 'BUKA')">BUKA</button>
+          <button id="btn-akt-tutup" onclick="sendManual('aktuator', 'TUTUP')">TUTUP</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="glass-card">
+      <div class="section-title"><i class="fa-solid fa-bullseye"></i> Target Tinggi Sawah</div>
+      <p style="color: var(--text-muted); font-size: 14px;">Atur batas ketinggian air yang diinginkan untuk sawah. Sistem akan mempertahankan air di angka ini secara otomatis.</p>
+      
+      <div class="slider-container">
+        <span style="font-size: 14px;">5 cm</span>
+        <input type="range" id="settingSlider" min="5" max="30" value="14" oninput="updateSliderValue(this.value)">
+        <span style="font-size: 14px;">30 cm</span>
+      </div>
+      
+      <div style="text-align: center; margin-bottom: 15px;">
+        <span class="target-val"><span id="sliderValue">14</span> cm</span>
+      </div>
+      
+      <button class="btn-kirim" onclick="setSetting()">KIRIM PENGATURAN</button>
+      <p style="text-align: center; margin-top: 15px; font-size: 14px;">Target Tersimpan di Sistem: <strong id="target-status" style="color:var(--accent-yellow);">--</strong> cm</p>
+    </div>
+
+  </div>
+
+  <div class="glass-card" style="margin-bottom: 30px;">
+    <div class="section-title"><i class="fa-solid fa-chart-line"></i> Tren Pemantauan Real-time</div>
+    <div class="chart-section">
+      <div class="chart-box"><canvas id="soilChart"></canvas></div>
+      <div class="chart-box"><canvas id="sawahChart"></canvas></div>
+      <div class="chart-box"><canvas id="tambakChart"></canvas></div>
+    </div>
   </div>
 
   <script src="app.js"></script>
