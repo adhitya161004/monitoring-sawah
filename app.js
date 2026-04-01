@@ -1,51 +1,100 @@
 const options = { username: "monitoringsawahbyarnf", password: "Gakkenek1", protocol: "wss" };
 const client = mqtt.connect("wss://3bf57b9ff69e4d24ac2161a9955cac2d.s1.eu.hivemq.cloud:8884/mqtt", options);
 
-// FUNGSI BARU: Agar setiap grafik punya pengaturan sendiri dan tidak berebut
+// FUNGSI PENGATURAN GRAFIK ELEGAN (TEMA GELAP)
 function getChartOptions() {
   return { 
     responsive: true, 
-    animation: false, 
-    plugins: { legend: { labels: { color: "white" } } }, 
-    scales: { y: { ticks: { color: "white" } }, x: { ticks: { color: "white" } } } 
+    maintainAspectRatio: false,
+    animation: { duration: 0 }, 
+    plugins: { 
+      legend: { labels: { color: "#e2e8f0", font: { family: "'Poppins', sans-serif" } } } 
+    }, 
+    scales: { 
+      y: { grid: { color: "rgba(255,255,255,0.05)" }, ticks: { color: "#94a3b8" } }, 
+      x: { grid: { display: false }, ticks: { color: "#94a3b8", maxRotation: 45, minRotation: 45 } } 
+    } 
   };
 }
 
+// INISIALISASI 3 GRAFIK
 const ctxSoil = document.getElementById("soilChart").getContext("2d");
-const soilChart = new Chart(ctxSoil, { type: "line", data: { labels: [], datasets: [{ label: "Soil Moisture (%)", data: [], borderColor: "#2ecc71", backgroundColor: "rgba(46, 204, 113, 0.1)", borderWidth: 2, fill: true, tension: 0.3 }] }, options: getChartOptions() });
+const soilChart = new Chart(ctxSoil, { type: "line", data: { labels: [], datasets: [{ label: "Kelembapan Tanah (%)", data: [], borderColor: "#10b981", backgroundColor: "rgba(16, 185, 129, 0.1)", borderWidth: 2, fill: true, tension: 0.4 }] }, options: getChartOptions() });
 
 const ctxSawah = document.getElementById("sawahChart").getContext("2d");
-const sawahChart = new Chart(ctxSawah, { type: "line", data: { labels: [], datasets: [{ label: "Tinggi Sawah (cm)", data: [], borderColor: "#3498db", backgroundColor: "rgba(52, 152, 219, 0.1)", borderWidth: 2, fill: true, tension: 0.3 }] }, options: getChartOptions() });
+const sawahChart = new Chart(ctxSawah, { type: "line", data: { labels: [], datasets: [{ label: "Tinggi Sawah (cm)", data: [], borderColor: "#3b82f6", backgroundColor: "rgba(59, 130, 246, 0.1)", borderWidth: 2, fill: true, tension: 0.4 }] }, options: getChartOptions() });
 
 const ctxTambak = document.getElementById("tambakChart").getContext("2d");
-const tambakChart = new Chart(ctxTambak, { type: "line", data: { labels: [], datasets: [{ label: "Tinggi Tambak (cm)", data: [], borderColor: "#9b59b6", backgroundColor: "rgba(155, 89, 182, 0.1)", borderWidth: 2, fill: true, tension: 0.3 }] }, options: getChartOptions() });
+const tambakChart = new Chart(ctxTambak, { type: "line", data: { labels: [], datasets: [{ label: "Tinggi Tambak (cm)", data: [], borderColor: "#fbbf24", backgroundColor: "rgba(251, 191, 36, 0.1)", borderWidth: 2, fill: true, tension: 0.4 }] }, options: getChartOptions() });
 
+// FUNGSI UI - UPDATE WARNA TOMBOL
+function updateButtonUI(groupId, activeBtnId, activeClass) {
+  const group = {
+    'mode': ['btn-auto', 'btn-manual'],
+    'p1': ['btn-p1-on', 'btn-p1-off'],
+    'p2': ['btn-p2-on', 'btn-p2-off'],
+    'akt': ['btn-akt-buka', 'btn-akt-tutup']
+  };
+  
+  group[groupId].forEach(id => {
+    document.getElementById(id).className = (id === activeBtnId) ? activeClass : '';
+  });
+}
+
+// SLIDER TARGET
+window.updateSliderValue = function(val) {
+  document.getElementById("sliderValue").innerText = val;
+};
+
+// KONEKSI MQTT
 client.on("connect", function () {
-  document.getElementById("status-text").innerText = "Terhubung";
-  document.getElementById("led").className = "status-led green";
+  const badge = document.getElementById("conn-status");
+  badge.className = "status-badge"; // Remove offline class
+  document.getElementById("status-text").innerText = "TERHUBUNG";
+  
   client.subscribe("sawah/data");
   client.subscribe("sistem/mode");
   client.subscribe("sistem/setting_tinggi");
 });
 
+client.on("error", function () {
+  const badge = document.getElementById("conn-status");
+  badge.className = "status-badge offline";
+  document.getElementById("status-text").innerText = "KONEKSI TERPUTUS";
+});
+
+// TERIMA DATA DARI ESP32
 client.on("message", function (topic, message) {
   let rawValue = message.toString();
   
+  if (topic === "sistem/mode") {
+    if(rawValue === "AUTO") updateButtonUI('mode', 'btn-auto', 'active-on');
+    else updateButtonUI('mode', 'btn-manual', 'active-off');
+  }
+  
+  if (topic === "sistem/setting_tinggi") {
+    document.getElementById("target-status").innerText = rawValue;
+    document.getElementById("settingSlider").value = rawValue;
+    updateSliderValue(rawValue);
+  }
+
   if (topic === "sawah/data") {
     try {
       let data = JSON.parse(rawValue);
-      const timeNow = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+      const timeNow = new Date().toLocaleTimeString('id-ID', { hour: "2-digit", minute: "2-digit", second: "2-digit" });
 
+      // Update Angka
       if (data.soil !== undefined) document.getElementById("soil").innerText = data.soil + " %";
       if (data.sawah !== undefined) document.getElementById("sawah").innerText = data.sawah.toFixed(1) + " cm";
       if (data.tambak !== undefined) document.getElementById("tambak").innerText = data.tambak.toFixed(1) + " cm";
       if (data.battery !== undefined) document.getElementById("battery").innerText = data.battery + " %";
 
-      // Tangkap status Relay
-      if (data.pompa1 !== undefined) document.getElementById("status-p1").innerText = data.pompa1;
-      if (data.pompa2 !== undefined) document.getElementById("status-p2").innerText = data.pompa2;
-      if (data.aktuator !== undefined) document.getElementById("status-akt").innerText = data.aktuator;
+      // Update Tombol Status Relay (Real-time feedback)
+      if (data.pompa1 === "ON") updateButtonUI('p1', 'btn-p1-on', 'active-on'); else updateButtonUI('p1', 'btn-p1-off', 'active-off');
+      if (data.pompa2 === "ON") updateButtonUI('p2', 'btn-p2-on', 'active-on'); else updateButtonUI('p2', 'btn-p2-off', 'active-off');
+      if (data.aktuator === "BUKA") updateButtonUI('akt', 'btn-akt-buka', 'active-on'); else updateButtonUI('akt', 'btn-akt-tutup', 'active-off');
 
+      // Update Grafik
       if (data.soil !== undefined) {
         soilChart.data.labels.push(timeNow);
         soilChart.data.datasets[0].data.push(data.soil);
@@ -69,20 +118,26 @@ client.on("message", function (topic, message) {
 
     } catch (error) { console.log("Gagal memproses JSON", error); }
   }
-  
-  if (topic === "sistem/mode") document.getElementById("mode-status").innerText = "Mode: " + rawValue;
-  if (topic === "sistem/setting_tinggi") document.getElementById("target-status").innerText = rawValue;
 });
 
-client.on("error", function () {
-  document.getElementById("status-text").innerText = "Koneksi Terputus";
-  document.getElementById("led").className = "status-led red";
-});
+// FUNGSI KIRIM PERINTAH
+window.setMode = function(mode) { 
+  client.publish("sistem/mode", mode); 
+};
 
-window.setMode = function(mode) { client.publish("sistem/mode", mode); };
-window.sendManual = function(device, state) { client.publish("manual/" + device, state); };
+window.sendManual = function(device, state) { 
+  client.publish("manual/" + device, state); 
+};
+
 window.setSetting = function() {
-  let value = document.getElementById("settingInput").value;
-  if (value >= 5 && value <= 30) client.publish("sistem/setting_tinggi", value);
-  else alert("Setting tinggi sawah harus di antara 5 - 30 cm");
+  let value = document.getElementById("settingSlider").value;
+  client.publish("sistem/setting_tinggi", value);
+  // Animasi klik tombol sebentar
+  const btn = document.querySelector('.btn-kirim');
+  btn.innerText = "BERHASIL DIKIRIM!";
+  btn.style.background = "#10b981";
+  setTimeout(() => {
+    btn.innerText = "KIRIM PENGATURAN";
+    btn.style.background = "#3b82f6";
+  }, 2000);
 };
