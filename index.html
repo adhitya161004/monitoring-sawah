@@ -10,6 +10,8 @@
   
   <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.0"></script>
   
   <style>
     /* VARIABEL WARNA (TEMA BIRU & KUNING ELEGAN) */
@@ -42,6 +44,8 @@
       margin-bottom: 30px;
       padding-bottom: 15px;
       border-bottom: 1px solid var(--glass-border);
+      flex-wrap: wrap;
+      gap: 15px;
     }
     .title-wrapper h1 { font-size: 24px; color: var(--accent-yellow); font-weight: 700; }
     .title-wrapper i { color: #10b981; margin-right: 8px; }
@@ -58,6 +62,12 @@
       gap: 8px;
     }
     .status-badge.offline { background: rgba(239, 68, 68, 0.2); color: #ef4444; }
+
+    .nav-btn {
+      background: rgba(255,255,255,0.1); color: white; padding: 8px 15px; 
+      border-radius: 8px; text-decoration: none; font-size: 14px; transition: 0.3s;
+    }
+    .nav-btn:hover { background: rgba(255,255,255,0.2); }
 
     /* KOMPONEN KACA (GLASSMORPHISM) */
     .glass-card {
@@ -116,7 +126,7 @@
 
     /* GRAFIK */
     .chart-section { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; }
-    .chart-box { height: 250px; }
+    .chart-box { height: 250px; cursor: ew-resize; } /* Kursor berubah untuk indikasi bisa digeser */
     .section-title { font-size: 18px; font-weight: 600; color: var(--accent-yellow); margin-bottom: 15px; display: flex; align-items: center; gap: 10px; }
   </style>
 </head>
@@ -126,8 +136,11 @@
     <div class="title-wrapper">
       <h1><i class="fa-solid fa-wheat-awn"></i> Monitoring Sawah by ARNF</h1>
     </div>
-    <div class="status-badge offline" id="conn-status">
-      <i class="fa-solid fa-wifi"></i> <span id="status-text">Menghubungkan...</span>
+    <div style="display: flex; gap: 15px; align-items: center;">
+      <a href="riwayat.html" class="nav-btn"><i class="fa-solid fa-table"></i> Buka Database</a>
+      <div class="status-badge offline" id="conn-status">
+        <i class="fa-solid fa-wifi"></i> <span id="status-text">Menghubungkan...</span>
+      </div>
     </div>
   </header>
 
@@ -211,7 +224,10 @@
   </div>
 
   <div class="glass-card" style="margin-bottom: 30px;">
-    <div class="section-title"><i class="fa-solid fa-chart-line"></i> Tren Pemantauan Real-time</div>
+    <div class="section-title" style="justify-content: space-between;">
+      <span><i class="fa-solid fa-chart-line"></i> Tren Pemantauan Real-time</span>
+      <span style="font-size: 12px; color: var(--text-muted); font-weight: normal;"><i class="fa-solid fa-hand-pointer"></i> Geser grafik untuk melihat masa lalu</span>
+    </div>
     <div class="chart-section">
       <div class="chart-box"><canvas id="soilChart"></canvas></div>
       <div class="chart-box"><canvas id="sawahChart"></canvas></div>
