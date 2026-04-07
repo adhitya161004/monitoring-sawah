@@ -1,240 +1,188 @@
-<!doctype html>
-<html lang="id">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Monitoring Sawah by ARNF</title>
+/************************************************************
+  KODE FINAL ESP32: LOGIKA HEMAT AIR & DURASI (RUNTIME)
+************************************************************/
+
+#include <WiFi.h>
+#include <WiFiClientSecure.h>
+#include <PubSubClient.h>
+#include <ArduinoJson.h>
+#include <SPI.h>
+#include <SD.h>
+#include <time.h>
+#include <FirebaseESP32.h> 
+
+const char* ssid = "oo";
+const char* password = "gakkenek123";
+
+#define FIREBASE_HOST "my-monitoringsawaharnf-default-rtdb.asia-southeast1.firebasedatabase.app"
+#define FIREBASE_AUTH "qvhTBUaXXmJpfFKgd8HMrgwIEwR5uK43QMC3k7FU"
+const char* mqtt_server = "3bf57b9ff69e4d24ac2161a9955cac2d.s1.eu.hivemq.cloud";
+const int mqtt_port = 8883;
+const char* mqtt_user = "monitoringsawahbyarnf";
+const char* mqtt_pass = "Gakkenek1";
+
+WiFiClientSecure espClient;
+PubSubClient client(espClient);
+FirebaseData firebaseData;
+FirebaseConfig config;
+FirebaseAuth auth;
+
+#define RELAY_POMPA1 27 
+#define RELAY_POMPA2 21   
+#define RELAY_AKTUATOR 22 
+#define SD_CS_PIN 5
+#define RXD2 16 
+#define TXD2 17 
+
+unsigned long lastCloudUpdate = 0;
+String modeSistem = "MANUAL"; 
+float settingSawah = 14.0;    
+
+float lastTambak = 0.0, lastSawah = 0.0;  
+int valSoil = 0, valBatt = 0;
+
+// Variabel untuk Durasi Aktif (Runtime)
+unsigned long detikP1 = 0, detikP2 = 0, detikAkt = 0;
+unsigned long milisLalu = 0;
+int tanggalLalu = -1;
+
+void setup_wifi() {
+  WiFi.begin(ssid, password);
+  while (WiFi.status() != WL_CONNECTED) { delay(500); }
+  configTime(7 * 3600, 0, "pool.ntp.org", "time.nist.gov"); // Setting Waktu WIB (NTP)
+}
+
+void callback(char* topic, byte* payload, unsigned int length) {
+  String msg = "";
+  for (int i = 0; i < length; i++) msg += (char)payload[i];
   
-  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  if (String(topic) == "sistem/mode") {
+    modeSistem = msg;
+    if (modeSistem == "MANUAL") {
+      digitalWrite(RELAY_POMPA1, LOW); digitalWrite(RELAY_POMPA2, LOW); digitalWrite(RELAY_AKTUATOR, LOW);
+    }
+  }
+  if (String(topic) == "sistem/setting_tinggi") settingSawah = msg.toFloat();
+
+  if (modeSistem == "MANUAL") {
+    if (String(topic) == "manual/pompa1") digitalWrite(RELAY_POMPA1, (msg == "ON") ? HIGH : LOW);
+    else if (String(topic) == "manual/pompa2") digitalWrite(RELAY_POMPA2, (msg == "ON") ? HIGH : LOW);
+    else if (String(topic) == "manual/aktuator") digitalWrite(RELAY_AKTUATOR, (msg == "BUKA") ? HIGH : LOW);
+  }
+}
+
+void reconnect() {
+  while (!client.connected()) {
+    if (client.connect("ESP32_Irigasi_01", mqtt_user, mqtt_pass)) {
+      client.subscribe("sistem/mode"); client.subscribe("sistem/setting_tinggi"); client.subscribe("manual/#");
+    } else { delay(2000); }
+  }
+}
+
+void setup() {
+  Serial.begin(115200);
+  Serial2.begin(9600, SERIAL_8N1, RXD2, TXD2); 
+
+  pinMode(RELAY_POMPA1, OUTPUT); pinMode(RELAY_POMPA2, OUTPUT); pinMode(RELAY_AKTUATOR, OUTPUT);
+  digitalWrite(RELAY_POMPA1, LOW); digitalWrite(RELAY_POMPA2, LOW); digitalWrite(RELAY_AKTUATOR, LOW);
+
+  setup_wifi();
   
-  <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.0"></script>
+  config.host = FIREBASE_HOST; config.signer.tokens.legacy_token = FIREBASE_AUTH;
+  Firebase.begin(&config, &auth); Firebase.reconnectWiFi(true);
+
+  espClient.setInsecure(); client.setServer(mqtt_server, mqtt_port); client.setCallback(callback);
   
-  <style>
-    /* VARIABEL WARNA (TEMA BIRU & KUNING ELEGAN) */
-    :root {
-      --bg-main: #0a192f;
-      --glass-bg: rgba(255, 255, 255, 0.05);
-      --glass-border: rgba(255, 255, 255, 0.1);
-      --text-main: #e2e8f0;
-      --text-muted: #94a3b8;
-      --accent-yellow: #fbbf24;
-      --accent-blue: #3b82f6;
-      --status-on: #10b981;
-      --status-off: #ef4444;
+  if (SD.begin(SD_CS_PIN)) {
+    if (!SD.exists("/log_harian.csv")) {
+      File f = SD.open("/log_harian.csv", FILE_WRITE);
+      if (f) { f.println("Waktu,Tambak(cm),Sawah(cm),Soil(%),Baterai(%)"); f.close(); }
     }
+  }
+}
 
-    * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Poppins', sans-serif; }
-    
-    body {
-      background: radial-gradient(circle at top right, #112240, var(--bg-main));
-      color: var(--text-main);
-      min-height: 100vh;
-      padding: 20px;
+void loop() {
+  if (!client.connected()) reconnect();
+  client.loop();
+
+  // 1. TERIMA DATA DARI ARDUINO
+  if (Serial2.available()) {
+    String dataMasuk = Serial2.readStringUntil('\n'); dataMasuk.trim(); 
+    int koma1 = dataMasuk.indexOf(','); int koma2 = dataMasuk.indexOf(',', koma1 + 1); int koma3 = dataMasuk.indexOf(',', koma2 + 1);
+    if (koma1 > 0 && koma2 > 0 && koma3 > 0) {
+      lastTambak = dataMasuk.substring(0, koma1).toFloat();
+      lastSawah = dataMasuk.substring(koma1 + 1, koma2).toFloat();
+      valSoil = dataMasuk.substring(koma2 + 1, koma3).toInt();
+      valBatt = dataMasuk.substring(koma3 + 1).toInt();
     }
+  }
 
-    /* HEADER */
-    header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 30px;
-      padding-bottom: 15px;
-      border-bottom: 1px solid var(--glass-border);
-      flex-wrap: wrap;
-      gap: 15px;
-    }
-    .title-wrapper h1 { font-size: 24px; color: var(--accent-yellow); font-weight: 700; }
-    .title-wrapper i { color: #10b981; margin-right: 8px; }
-    
-    .status-badge {
-      background: rgba(16, 185, 129, 0.2);
-      color: #10b981;
-      padding: 8px 16px;
-      border-radius: 20px;
-      font-size: 14px;
-      font-weight: 600;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-    .status-badge.offline { background: rgba(239, 68, 68, 0.2); color: #ef4444; }
+  // 2. LOGIKA AUTO & HEMAT AIR TAMBAK
+  if (modeSistem == "AUTO" && lastTambak >= 0 && lastSawah >= 0) {
+    float persenTambak = (lastTambak / 275.0) * 100.0; // Hitung % air tambak
 
-    .nav-btn {
-      background: rgba(255,255,255,0.1); color: white; padding: 8px 15px; 
-      border-radius: 8px; text-decoration: none; font-size: 14px; transition: 0.3s;
-    }
-    .nav-btn:hover { background: rgba(255,255,255,0.2); }
+    if (persenTambak >= 45.0) {
+      // --- MODE NORMAL ---
+      if (lastSawah < (settingSawah - 5.0)) digitalWrite(RELAY_POMPA1, HIGH); 
+      else if (lastSawah >= settingSawah) digitalWrite(RELAY_POMPA1, LOW);  
 
-    /* KOMPONEN KACA (GLASSMORPHISM) */
-    .glass-card {
-      background: var(--glass-bg);
-      backdrop-filter: blur(10px);
-      -webkit-backdrop-filter: blur(10px);
-      border: 1px solid var(--glass-border);
-      border-radius: 16px;
-      padding: 20px;
-      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-    }
+      if (lastSawah > (settingSawah + 5.0) && lastTambak < 270.0) digitalWrite(RELAY_POMPA2, HIGH); 
+      else if (lastSawah <= settingSawah) digitalWrite(RELAY_POMPA2, LOW);  
 
-    /* GRID LAYOUT UTAMA */
-    .dashboard-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-      gap: 20px;
-      margin-bottom: 20px;
-    }
-
-    /* KARTU SENSOR */
-    .sensor-card { text-align: center; }
-    .sensor-title { font-size: 14px; color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 15px; }
-    .sensor-icon { font-size: 40px; margin-bottom: 10px; color: var(--accent-blue); }
-    .sensor-icon.soil { color: #10b981; }
-    .sensor-icon.batt { color: var(--text-main); }
-    .sensor-value { font-size: 36px; font-weight: 700; color: var(--accent-yellow); }
-
-    /* KONTROL PANEL & SLIDER */
-    .control-grid {
-      display: grid;
-      grid-template-columns: 1fr 2fr;
-      gap: 20px;
-      margin-bottom: 20px;
-    }
-    @media (max-width: 768px) { .control-grid { grid-template-columns: 1fr; } }
-
-    .control-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
-    .control-row span { font-size: 16px; font-weight: 600; }
-    
-    .btn-group { display: flex; gap: 5px; }
-    button {
-      border: none; padding: 8px 15px; border-radius: 8px; font-weight: 600; cursor: pointer; transition: 0.3s;
-      background: rgba(255, 255, 255, 0.1); color: var(--text-main);
-    }
-    button:hover { background: rgba(255, 255, 255, 0.2); }
-    button.active-on { background: var(--status-on); color: white; box-shadow: 0 0 10px rgba(16, 185, 129, 0.4); }
-    button.active-off { background: var(--status-off); color: white; }
-
-    /* RANGE SLIDER */
-    .slider-container { margin: 25px 0; display: flex; align-items: center; gap: 15px; }
-    input[type=range] { flex: 1; accent-color: var(--accent-yellow); cursor: pointer; }
-    .target-val { font-size: 24px; font-weight: bold; color: var(--accent-yellow); min-width: 80px; text-align: right; }
-    .btn-kirim { background: var(--accent-blue); color: white; padding: 10px 20px; font-size: 16px; width: 100%; margin-top: 10px; }
-    .btn-kirim:hover { background: #2563eb; }
-
-    /* GRAFIK */
-    .chart-section { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; }
-    .chart-box { height: 250px; cursor: ew-resize; } /* Kursor berubah untuk indikasi bisa digeser */
-    .section-title { font-size: 18px; font-weight: 600; color: var(--accent-yellow); margin-bottom: 15px; display: flex; align-items: center; gap: 10px; }
-  </style>
-</head>
-<body>
-
-  <header>
-    <div class="title-wrapper">
-      <h1><i class="fa-solid fa-wheat-awn"></i> Monitoring Sawah by ARNF</h1>
-    </div>
-    <div style="display: flex; gap: 15px; align-items: center;">
-      <a href="riwayat.html" class="nav-btn"><i class="fa-solid fa-table"></i> Buka Database</a>
-      <div class="status-badge offline" id="conn-status">
-        <i class="fa-solid fa-wifi"></i> <span id="status-text">Menghubungkan...</span>
-      </div>
-    </div>
-  </header>
-
-  <div class="dashboard-grid">
-    <div class="glass-card sensor-card">
-      <div class="sensor-title">Kelembapan Tanah</div>
-      <div class="sensor-icon soil"><i class="fa-solid fa-droplet"></i></div>
-      <div class="sensor-value" id="soil">-- %</div>
-    </div>
-    <div class="glass-card sensor-card">
-      <div class="sensor-title">Tinggi Sawah</div>
-      <div class="sensor-icon"><i class="fa-solid fa-water"></i></div>
-      <div class="sensor-value" id="sawah">-- cm</div>
-    </div>
-    <div class="glass-card sensor-card">
-      <div class="sensor-title">Tinggi Tambak</div>
-      <div class="sensor-icon"><i class="fa-solid fa-water"></i></div>
-      <div class="sensor-value" id="tambak">-- cm</div>
-    </div>
-    <div class="glass-card sensor-card">
-      <div class="sensor-title">Baterai Sistem</div>
-      <div class="sensor-icon batt"><i class="fa-solid fa-battery-half"></i></div>
-      <div class="sensor-value" id="battery">-- %</div>
-    </div>
-  </div>
-
-  <div class="control-grid">
-    
-    <div class="glass-card">
-      <div class="section-title"><i class="fa-solid fa-sliders"></i> Kontrol Manual</div>
-      <div class="control-row" style="border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom:15px; margin-bottom:15px;">
-        <span style="color: var(--accent-yellow);">Mode Sistem</span>
-        <div class="btn-group">
-          <button id="btn-auto" onclick="setMode('AUTO')">OTOMATIS</button>
-          <button id="btn-manual" onclick="setMode('MANUAL')">MANUAL</button>
-        </div>
-      </div>
-      <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 10px;">*Tombol di bawah hanya aktif pada mode MANUAL</p>
+      if (lastTambak >= 270.0 && lastSawah >= settingSawah) digitalWrite(RELAY_AKTUATOR, HIGH); 
+      else digitalWrite(RELAY_AKTUATOR, LOW);  
+    } else {
+      // --- MODE HEMAT AIR (< 45%) ---
+      if (valSoil < 90) digitalWrite(RELAY_POMPA1, HIGH);
+      else if (valSoil >= 100) digitalWrite(RELAY_POMPA1, LOW);
       
-      <div class="control-row">
-        <span><i class="fa-solid fa-pump-water" style="color:#3b82f6; margin-right:8px;"></i> Pompa 1</span>
-        <div class="btn-group">
-          <button id="btn-p1-on" onclick="sendManual('pompa1', 'ON')">ON</button>
-          <button id="btn-p1-off" onclick="sendManual('pompa1', 'OFF')">OFF</button>
-        </div>
-      </div>
-      <div class="control-row">
-        <span><i class="fa-solid fa-pump-water" style="color:#3b82f6; margin-right:8px;"></i> Pompa 2</span>
-        <div class="btn-group">
-          <button id="btn-p2-on" onclick="sendManual('pompa2', 'ON')">ON</button>
-          <button id="btn-p2-off" onclick="sendManual('pompa2', 'OFF')">OFF</button>
-        </div>
-      </div>
-      <div class="control-row">
-        <span><i class="fa-solid fa-door-open" style="color:#fbbf24; margin-right:8px;"></i> Aktuator</span>
-        <div class="btn-group">
-          <button id="btn-akt-buka" onclick="sendManual('aktuator', 'BUKA')">BUKA</button>
-          <button id="btn-akt-tutup" onclick="sendManual('aktuator', 'TUTUP')">TUTUP</button>
-        </div>
-      </div>
-    </div>
+      digitalWrite(RELAY_POMPA2, LOW);  
+      digitalWrite(RELAY_AKTUATOR, LOW); 
+    }
+  }
 
-    <div class="glass-card">
-      <div class="section-title"><i class="fa-solid fa-bullseye"></i> Target Tinggi Sawah</div>
-      <p style="color: var(--text-muted); font-size: 14px;">Atur batas ketinggian air yang diinginkan untuk sawah. Sistem akan mempertahankan air di angka ini secara otomatis.</p>
-      
-      <div class="slider-container">
-        <span style="font-size: 14px;">5 cm</span>
-        <input type="range" id="settingSlider" min="5" max="30" value="14" oninput="updateSliderValue(this.value)">
-        <span style="font-size: 14px;">30 cm</span>
-      </div>
-      
-      <div style="text-align: center; margin-bottom: 15px;">
-        <span class="target-val"><span id="sliderValue">14</span> cm</span>
-      </div>
-      
-      <button class="btn-kirim" onclick="setSetting()">KIRIM PENGATURAN</button>
-      <p style="text-align: center; margin-top: 15px; font-size: 14px;">Target Tersimpan di Sistem: <strong id="target-status" style="color:var(--accent-yellow);">--</strong> cm</p>
-    </div>
+  // 3. PENGHITUNG DURASI AKTIF (RUNTIME)
+  unsigned long milisSekarang = millis();
+  if (milisSekarang - milisLalu >= 1000) {
+    milisLalu = milisSekarang;
+    if (digitalRead(RELAY_POMPA1)) detikP1++;
+    if (digitalRead(RELAY_POMPA2)) detikP2++;
+    if (digitalRead(RELAY_AKTUATOR)) detikAkt++;
 
-  </div>
+    // Reset otomatis jam 00:00 WIB
+    struct tm timeinfo;
+    if (getLocalTime(&timeinfo)) {
+      if (timeinfo.tm_mday != tanggalLalu) {
+        detikP1 = 0; detikP2 = 0; detikAkt = 0;
+        tanggalLalu = timeinfo.tm_mday;
+      }
+    }
+  }
 
-  <div class="glass-card" style="margin-bottom: 30px;">
-    <div class="section-title" style="justify-content: space-between;">
-      <span><i class="fa-solid fa-chart-line"></i> Tren Pemantauan Real-time</span>
-      <span style="font-size: 12px; color: var(--text-muted); font-weight: normal;"><i class="fa-solid fa-hand-pointer"></i> Geser grafik untuk melihat masa lalu</span>
-    </div>
-    <div class="chart-section">
-      <div class="chart-box"><canvas id="soilChart"></canvas></div>
-      <div class="chart-box"><canvas id="sawahChart"></canvas></div>
-      <div class="chart-box"><canvas id="tambakChart"></canvas></div>
-    </div>
-  </div>
+  // 4. KIRIM DATA KE MQTT & FIREBASE
+  if (millis() - lastCloudUpdate >= 5000) {
+    lastCloudUpdate = millis();
+    
+    StaticJsonDocument<512> doc; // Diperbesar kapasitasnya
+    doc["tambak"] = lastTambak; doc["sawah"] = lastSawah; 
+    doc["soil"] = valSoil; doc["battery"] = valBatt;
+    doc["pompa1"] = digitalRead(RELAY_POMPA1) ? "ON" : "OFF";
+    doc["pompa2"] = digitalRead(RELAY_POMPA2) ? "ON" : "OFF";
+    doc["aktuator"] = digitalRead(RELAY_AKTUATOR) ? "BUKA" : "TUTUP";
+    doc["durP1"] = detikP1; doc["durP2"] = detikP2; doc["durAkt"] = detikAkt;
+    
+    char buffer[400]; serializeJson(doc, buffer);
+    client.publish("sawah/data", buffer);
 
-  <script src="app.js"></script>
-</body>
-</html>
+    FirebaseJson fbJson;
+    fbJson.set("tambak", lastTambak); fbJson.set("sawah", lastSawah); fbJson.set("soil", valSoil); fbJson.set("battery", valBatt);
+    struct tm timeinfo;
+    if (getLocalTime(&timeinfo)) {
+      char w[25]; strftime(w, sizeof(w), "%Y-%m-%d %H:%M:%S", &timeinfo);
+      fbJson.set("waktu", String(w)); 
+      File f = SD.open("/log_harian.csv", FILE_APPEND);
+      if (f) { f.printf("%s,%.2f,%.2f,%d,%d\n", w, lastTambak, lastSawah, valSoil, valBatt); f.close(); }
+    }
+    Firebase.pushJSON(firebaseData, "/riwayat_data", fbJson);
+  }
+}
