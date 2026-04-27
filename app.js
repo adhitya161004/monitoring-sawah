@@ -5,7 +5,6 @@ const firebaseREST = 'https://my-monitoringsawaharnf-default-rtdb.asia-southeast
 const MAX_DATA_MEMORY = 2000; 
 const TAMPILAN_DILAYAR = 30;  
 
-// Fungsi Konversi Waktu (Detik -> Jam:Menit:Detik)
 function formatKeWaktu(totalDetik) {
   const jam = Math.floor(totalDetik / 3600);
   const menit = Math.floor((totalDetik % 3600) / 60);
@@ -77,7 +76,7 @@ async function ambilDataAwalDariFirebase() {
       if (lastRecord.soil !== undefined) document.getElementById("soil").innerText = lastRecord.soil + " %";
       if (lastRecord.sawah !== undefined) document.getElementById("sawah").innerText = lastRecord.sawah.toFixed(1) + " cm";
       if (lastRecord.tambak !== undefined) document.getElementById("tambak").innerText = lastRecord.tambak.toFixed(1) + " cm";
-      if (lastRecord.battery !== undefined) document.getElementById("battery").innerText = lastRecord.battery + " %";
+      if (lastRecord.voltage !== undefined) document.getElementById("battery").innerText = lastRecord.voltage.toFixed(1) + " V";
     }
   } catch(err) { console.error("Gagal load history Firebase:", err); }
 }
@@ -116,13 +115,12 @@ client.on("message", function (topic, message) {
       if (data.soil !== undefined) document.getElementById("soil").innerText = data.soil + " %";
       if (data.sawah !== undefined) document.getElementById("sawah").innerText = data.sawah.toFixed(1) + " cm";
       if (data.tambak !== undefined) document.getElementById("tambak").innerText = data.tambak.toFixed(1) + " cm";
-      if (data.battery !== undefined) document.getElementById("battery").innerText = data.battery + " %";
+      if (data.voltage !== undefined) document.getElementById("battery").innerText = data.voltage.toFixed(1) + " V";
 
       if (data.pompa1 === "ON") updateButtonUI('p1', 'btn-p1-on', 'active-on'); else updateButtonUI('p1', 'btn-p1-off', 'active-off');
       if (data.pompa2 === "ON") updateButtonUI('p2', 'btn-p2-on', 'active-on'); else updateButtonUI('p2', 'btn-p2-off', 'active-off');
       if (data.aktuator === "BUKA") updateButtonUI('akt', 'btn-akt-buka', 'active-on'); else updateButtonUI('akt', 'btn-akt-tutup', 'active-off');
 
-      // Update Tampilan Durasi Runtime
       if (data.durP1 !== undefined) document.getElementById("durasi-p1").innerText = formatKeWaktu(data.durP1);
       if (data.durP2 !== undefined) document.getElementById("durasi-p2").innerText = formatKeWaktu(data.durP2);
       if (data.durAkt !== undefined) document.getElementById("durasi-akt").innerText = formatKeWaktu(data.durAkt);
