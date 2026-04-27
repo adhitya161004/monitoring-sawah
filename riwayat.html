@@ -90,7 +90,7 @@
             <th>Tinggi Sawah</th>
             <th>Tinggi Tambak</th>
             <th>Kelembapan Tanah</th>
-            <th>Baterai</th>
+            <th>Tegangan Baterai</th>
           </tr>
         </thead>
         <tbody id="tableBody">
@@ -124,7 +124,7 @@
               <td>${row.sawah !== undefined ? row.sawah.toFixed(1) : "-"} cm</td>
               <td>${row.tambak !== undefined ? row.tambak.toFixed(1) : "-"} cm</td>
               <td>${row.soil !== undefined ? row.soil : "-"} %</td>
-              <td>${row.battery !== undefined ? row.battery : "-"} %</td>
+              <td>${row.voltage !== undefined ? row.voltage.toFixed(1) : "-"} V</td>
             `;
             tbody.appendChild(tr);
           });
@@ -140,14 +140,14 @@
 
     function downloadCSV() {
       if (globalData.length === 0) { alert("Tidak ada data untuk di-download!"); return; }
-      let csvContent = "data:text/csv;charset=utf-8,Waktu,Tinggi Sawah (cm),Tinggi Tambak (cm),Kelembapan Tanah (%),Baterai (%)\n";
+      let csvContent = "data:text/csv;charset=utf-8,Waktu,Tinggi Sawah (cm),Tinggi Tambak (cm),Kelembapan Tanah (%),Tegangan Baterai (V)\n";
       globalData.forEach(row => {
         let sawah = row.sawah !== undefined ? row.sawah : "";
         let tambak = row.tambak !== undefined ? row.tambak : "";
         let soil = row.soil !== undefined ? row.soil : "";
-        let batt = row.battery !== undefined ? row.battery : "";
+        let volt = row.voltage !== undefined ? row.voltage : "";
         let waktu = row.waktu || "";
-        csvContent += `${waktu},${sawah},${tambak},${soil},${batt}\n`;
+        csvContent += `${waktu},${sawah},${tambak},${soil},${volt}\n`;
       });
       var encodedUri = encodeURI(csvContent);
       var link = document.createElement("a");
