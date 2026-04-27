@@ -8,6 +8,9 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.0"></script>
+  
   <style>
     :root {
       --bg-main: #0a192f; --glass-bg: rgba(255, 255, 255, 0.05); --glass-border: rgba(255, 255, 255, 0.1);
@@ -15,40 +18,56 @@
       --accent-blue: #3b82f6; --status-on: #10b981; --status-off: #ef4444;
     }
     * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Poppins', sans-serif; }
-    body { background: var(--bg-main); color: var(--text-main); padding: 20px; }
-    header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; border-bottom: 1px solid var(--glass-border); padding-bottom: 15px; }
-    .glass-card { background: var(--glass-bg); border: 1px solid var(--glass-border); border-radius: 15px; padding: 20px; margin-bottom: 20px; }
-    .status-badge { background: rgba(16, 185, 129, 0.2); color: #10b981; padding: 5px 15px; border-radius: 20px; font-size: 13px; }
+    body { background: radial-gradient(circle at top right, #112240, var(--bg-main)); color: var(--text-main); min-height: 100vh; padding: 20px; }
+
+    header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; padding-bottom: 15px; border-bottom: 1px solid var(--glass-border); flex-wrap: wrap; gap: 15px; }
+    .title-wrapper h1 { font-size: 24px; color: var(--accent-yellow); font-weight: 700; }
+    .status-badge { background: rgba(16, 185, 129, 0.2); color: #10b981; padding: 8px 16px; border-radius: 20px; font-size: 14px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
     .status-badge.offline { background: rgba(239, 68, 68, 0.2); color: #ef4444; }
-    .dashboard-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; }
+    .nav-btn { background: rgba(255,255,255,0.1); color: white; padding: 8px 15px; border-radius: 8px; text-decoration: none; font-size: 14px; transition: 0.3s; }
+
+    .glass-card { background: var(--glass-bg); backdrop-filter: blur(10px); border: 1px solid var(--glass-border); border-radius: 16px; padding: 20px; }
+    .dashboard-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 20px; margin-bottom: 20px; }
     .sensor-card { text-align: center; }
-    .sensor-value { font-size: 32px; font-weight: 700; color: var(--accent-yellow); margin-top: 10px; }
-    .control-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; }
+    .sensor-value { font-size: 36px; font-weight: 700; color: var(--accent-yellow); }
+
+    .control-grid { display: grid; grid-template-columns: 1fr 1fr 2fr; gap: 20px; margin-bottom: 20px; }
+    @media (max-width: 1024px) { .control-grid { grid-template-columns: 1fr; } }
     .control-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+    
     .btn-group { display: flex; gap: 5px; }
-    button { border: none; padding: 8px 12px; border-radius: 8px; font-weight: 600; cursor: pointer; background: rgba(255,255,255,0.1); color: white; transition: 0.3s; }
-    button.active-on { background: var(--status-on) !important; color: white; box-shadow: 0 0 10px var(--status-on); }
-    button.active-off { background: var(--status-off) !important; color: white; box-shadow: 0 0 10px var(--status-off); }
-    .device-val { font-family: monospace; color: var(--accent-yellow); background: rgba(0,0,0,0.2); padding: 2px 8px; border-radius: 5px; }
-    .chart-box { height: 250px; margin-top: 15px; }
+    button { border: none; padding: 8px 15px; border-radius: 8px; font-weight: 600; cursor: pointer; transition: 0.3s; background: rgba(255, 255, 255, 0.1); color: var(--text-main); }
+    
+    /* Warna Status Tombol */
+    button.active-on { background: var(--status-on) !important; color: white; box-shadow: 0 0 10px rgba(16, 185, 129, 0.4); }
+    button.active-off { background: var(--status-off) !important; color: white; box-shadow: 0 0 10px rgba(239, 68, 68, 0.4); }
+
+    .slider-container { margin: 25px 0; display: flex; align-items: center; gap: 15px; }
+    input[type=range] { flex: 1; accent-color: var(--accent-yellow); }
+    .device-val { font-family: monospace; font-size: 16px; color: var(--accent-yellow); background: rgba(0,0,0,0.3); padding: 4px 10px; border-radius: 6px; }
   </style>
 </head>
 <body>
   <header>
-    <h2 style="color:var(--accent-yellow);">Monitoring Sawah by ARNF</h2>
-    <div id="conn-status" class="status-badge offline"><span id="status-text">OFFLINE</span></div>
+    <div class="title-wrapper"><h1><i class="fa-solid fa-wheat-awn"></i> Monitoring Sawah by ARNF</h1></div>
+    <div style="display: flex; gap: 15px; align-items: center;">
+      <a href="riwayat.html" class="nav-btn"><i class="fa-solid fa-table"></i> Database</a>
+      <div class="status-badge offline" id="conn-status">
+        <i class="fa-solid fa-wifi"></i> <span id="status-text">Menghubungkan...</span>
+      </div>
+    </div>
   </header>
 
   <div class="dashboard-grid">
     <div class="glass-card sensor-card"><div>Kelembapan Tanah</div><div class="sensor-value" id="soil">-- %</div></div>
     <div class="glass-card sensor-card"><div>Tinggi Sawah</div><div class="sensor-value" id="sawah">-- cm</div></div>
     <div class="glass-card sensor-card"><div>Tinggi Tambak</div><div class="sensor-value" id="tambak">-- cm</div></div>
-    <div class="glass-card sensor-card"><div>Tegangan</div><div class="sensor-value" id="battery">-- V</div></div>
+    <div class="glass-card sensor-card"><div>Tegangan Sistem</div><div class="sensor-value" id="battery">-- V</div></div>
   </div>
 
   <div class="control-grid">
     <div class="glass-card">
-      <h3 style="margin-bottom:15px; color:var(--accent-blue);">Kontrol Manual</h3>
+      <div style="color:var(--accent-yellow); margin-bottom:15px;">Kontrol Manual</div>
       <div class="control-row">
         <span>Mode</span>
         <div class="btn-group">
@@ -80,25 +99,30 @@
     </div>
 
     <div class="glass-card">
-      <h3 style="margin-bottom:15px; color:var(--accent-blue);">Target & Durasi</h3>
-      <div class="control-row"><span>Target Tinggi</span><span class="device-val"><span id="target-status">--</span> cm</span></div>
-      <input type="range" id="settingSlider" min="0" max="30" style="width:100%; margin:10px 0;" oninput="updateSliderValue(this.value)">
-      <div style="text-align:center; margin-bottom:10px;"><span id="sliderValue">14</span> cm</div>
-      <button onclick="setSetting()" style="width:100%; background:var(--accent-blue);">KIRIM TARGET</button>
-      <hr style="margin:15px 0; border:0; border-top:1px solid var(--glass-border);">
-      <div class="control-row"><span>Pompa 1</span><span id="durasi-p1" class="device-val">00:00:00</span></div>
-      <div class="control-row"><span>Pompa 2</span><span id="durasi-p2" class="device-val">00:00:00</span></div>
-      <div class="control-row"><span>Aktuator</span><span id="durasi-akt" class="device-val">00:00:00</span></div>
+      <div style="color:var(--accent-yellow); margin-bottom:15px;">Durasi Aktif</div>
+      <div class="control-row"><span>P1</span><span id="durasi-p1" class="device-val">00:00:00</span></div>
+      <div class="control-row"><span>P2</span><span id="durasi-p2" class="device-val">00:00:00</span></div>
+      <div class="control-row"><span>Akt</span><span id="durasi-akt" class="device-val">00:00:00</span></div>
+    </div>
+
+    <div class="glass-card">
+      <div style="color:var(--accent-yellow); margin-bottom:15px;">Target Tinggi Sawah</div>
+      <div class="slider-container">
+        <span>0 cm</span><input type="range" id="settingSlider" min="0" max="30" value="14" oninput="updateSliderValue(this.value)"><span>30 cm</span>
+      </div>
+      <div style="text-align: center;"><span id="sliderValue" style="font-size:24px; color:var(--accent-yellow);">14</span> cm</div>
+      <button onclick="setSetting()" style="background:var(--accent-blue); width:100%; margin-top:10px;">KIRIM</button>
+      <p style="text-align:center; font-size:12px; margin-top:5px;">Tersimpan: <span id="target-status">--</span> cm</p>
     </div>
   </div>
 
   <div class="glass-card">
-    <h3 style="color:var(--accent-yellow);">Grafik Pemantauan</h3>
-    <div class="chart-box"><canvas id="soilChart"></canvas></div>
-    <div class="chart-box"><canvas id="sawahChart"></canvas></div>
-    <div class="chart-box"><canvas id="tambakChart"></canvas></div>
+    <div class="chart-section" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px;">
+      <div style="height:250px;"><canvas id="soilChart"></canvas></div>
+      <div style="height:250px;"><canvas id="sawahChart"></canvas></div>
+      <div style="height:250px;"><canvas id="tambakChart"></canvas></div>
+    </div>
   </div>
-
   <script src="app.js"></script>
 </body>
 </html>
