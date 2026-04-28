@@ -1,20 +1,24 @@
 // ==========================================
-// KONFIGURASI MQTT & FIREBASE
+// 1. KONFIGURASI MQTT & FIREBASE
 // ==========================================
 const options = { 
   username: "monitoringsawahbyarnf", 
   password: "Gakkenek1", 
   protocol: "wss" 
 };
+// Koneksi ke HiveMQ Cloud
 const client = mqtt.connect("wss://3bf57b9ff69e4d24ac2161a9955cac2d.s1.eu.hivemq.cloud:8884/mqtt", options);
 
+// Endpoint Firebase (Ambil 2000 data terakhir)
 const firebaseREST = 'https://my-monitoringsawaharnf-default-rtdb.asia-southeast1.firebasedatabase.app/riwayat_data.json?auth=qvhTBUaXXmJpfFKgd8HMrgwIEwR5uK43QMC3k7FU&orderBy="$key"&limitToLast=2000';
+
 const MAX_DATA_MEMORY = 2000; 
 const TAMPILAN_DILAYAR = 30;  
 
 // ==========================================
-// FUNGSI PENDUKUNG (WAKTU & UI)
+// 2. FUNGSI PENDUKUNG UI & FORMAT
 // ==========================================
+// Ubah detik ke format HH:MM:SS
 function formatKeWaktu(totalDetik) {
   const jam = Math.floor(totalDetik / 3600);
   const menit = Math.floor((totalDetik % 3600) / 60);
@@ -22,6 +26,7 @@ function formatKeWaktu(totalDetik) {
   return [jam, menit, detik].map(v => v < 10 ? "0" + v : v).join(":");
 }
 
+// Update warna tombol (Hijau untuk ON/BUKA/AUTO, Merah untuk OFF/TUTUP/MANUAL)
 function updateButtonUI(groupId, activeBtnId) {
   const config = {
     'mode': { on: 'btn-auto', off: 'btn-manual' },
@@ -50,13 +55,14 @@ function updateButtonUI(groupId, activeBtnId) {
   }
 }
 
+// Update teks angka di sebelah slider
 window.updateSliderValue = function(val) {
   const sliderVal = document.getElementById("sliderValue");
   if(sliderVal) sliderVal.innerText = val;
 };
 
 // ==========================================
-// INISIALISASI & KONFIGURASI GRAFIK (CHART.JS)
+// 3. INISIALISASI GRAFIK (CHART.JS)
 // ==========================================
 function getChartOptions() {
   return { 
@@ -83,6 +89,7 @@ const sawahChart = new Chart(ctxSawah, { type: "line", data: { labels: [], datas
 const ctxTambak = document.getElementById("tambakChart").getContext("2d");
 const tambakChart = new Chart(ctxTambak, { type: "line", data: { labels: [], datasets: [{ label: "Tinggi Tambak (cm)", data: [], borderColor: "#fbbf24", backgroundColor: "rgba(251, 191, 36, 0.1)", borderWidth: 2, fill: true, tension: 0.4 }] }, options: getChartOptions() });
 
+// Fungsi update titik grafik baru
 function updateChartData(chart, newData, timeStr) {
   chart.data.labels.push(timeStr);
   chart.data.datasets[0].data.push(newData);
@@ -97,7 +104,7 @@ function updateChartData(chart, newData, timeStr) {
 }
 
 // ==========================================
-// PENGAMBILAN DATA AWAL DARI FIREBASE
+// 4. LOAD STATE DARI FIREBASE (SAAT REFRESH)
 // ==========================================
 async function ambilDataAwalDariFirebase() {
   try {
@@ -105,6 +112,8 @@ async function ambilDataAwalDariFirebase() {
     const data = await response.json();
     if (data) {
       const records = Object.values(data);
+      
+      // Load riwayat ke grafik
       records.forEach(row => {
         let timeOnly = row.waktu ? row.waktu.split(" ")[1] : "";
         if (row.soil !== undefined) { soilChart.data.labels.push(timeOnly); soilChart.data.datasets[0].data.push(row.soil); }
@@ -122,12 +131,37 @@ async function ambilDataAwalDariFirebase() {
         ch.update(); 
       });
 
+      // Kembalikan STATE TERAKHIR ke Dashboard
       const lastRecord = records[records.length - 1];
       if (lastRecord) {
+        // 1. Angka Sensor
         if (lastRecord.soil !== undefined) document.getElementById("soil").innerText = lastRecord.soil + " %";
         if (lastRecord.sawah !== undefined) document.getElementById("sawah").innerText = lastRecord.sawah.toFixed(1) + " cm";
         if (lastRecord.tambak !== undefined) document.getElementById("tambak").innerText = lastRecord.tambak.toFixed(1) + " cm";
         if (lastRecord.voltage !== undefined) document.getElementById("battery").innerText = lastRecord.voltage.toFixed(1) + " V";
+
+        // 2. Status Tombol & Mode
+        if (lastRecord.mode) updateButtonUI('mode', lastRecord.mode === "AUTO" ? 'btn-auto' : 'btn-manual');
+        if (lastRecord.pompa1) updateButtonUI('p1', lastRecord.pompa1 === "ON" ? 'btn-p1-on' : 'btn-p1-off');
+        if (lastRecord.pompa2) updateButtonUI('p2', lastRecord.pompa2 === "ON" ? 'btn-p2-on' : 'btn-p2-off');
+        if (lastRecord.aktuator) updateButtonUI('akt', (lastRecord.aktuator === "BUKA" || lastRecord.aktuator === "OPEN") ? 'btn-akt-buka' : 'btn-akt-tutup');
+
+        // 3. Slider Target Tinggi
+        if (lastRecord.setting) {
+          const targetStatus = document.getElementById("target-status");
+          if(targetStatus) targetStatus.innerText = lastRecord.setting;
+          
+          const settingSlider = document.getElementById("settingSlider");
+          if(settingSlider) settingSlider.value = lastRecord.setting;
+          
+          const sliderValue = document.getElementById("sliderValue");
+          if(sliderValue) sliderValue.innerText = lastRecord.setting;
+        }
+
+        // 4. Durasi Aktif
+        if (lastRecord.durP1 !== undefined) document.getElementById("durasi-p1").innerText = formatKeWaktu(lastRecord.durP1);
+        if (lastRecord.durP2 !== undefined) document.getElementById("durasi-p2").innerText = formatKeWaktu(lastRecord.durP2);
+        if (lastRecord.durAkt !== undefined) document.getElementById("durasi-akt").innerText = formatKeWaktu(lastRecord.durAkt);
       }
     }
   } catch(err) { 
@@ -135,10 +169,11 @@ async function ambilDataAwalDariFirebase() {
   }
 }
 
+// Panggil fungsi saat web dibuka
 ambilDataAwalDariFirebase();
 
 // ==========================================
-// KONEKSI & PENANGANAN PESAN MQTT
+// 5. KONEKSI & PENANGANAN PESAN MQTT
 // ==========================================
 client.on("connect", function () {
   const badge = document.getElementById("conn-status"); 
@@ -147,6 +182,7 @@ client.on("connect", function () {
   const statusTxt = document.getElementById("status-text"); 
   if(statusTxt) statusTxt.innerText = "TERHUBUNG";
   
+  // Subscribe ke topik ESP32
   client.subscribe("sawah/data"); 
   client.subscribe("sistem/mode"); 
   client.subscribe("sistem/setting_tinggi");
@@ -160,6 +196,7 @@ client.on("error", function () {
   if(statusTxt) statusTxt.innerText = "KONEKSI TERPUTUS";
 });
 
+// Update UI secara Real-Time saat data masuk
 client.on("message", function (topic, message) {
   let rawValue = message.toString();
   
@@ -183,35 +220,35 @@ client.on("message", function (topic, message) {
       let data = JSON.parse(rawValue);
       const timeNow = new Date().toLocaleTimeString('id-ID', { hour: "2-digit", minute: "2-digit", second: "2-digit" });
 
-      // Update Angka Sensor
+      // 1. Angka Sensor
       if (data.soil !== undefined) document.getElementById("soil").innerText = data.soil + " %";
       if (data.sawah !== undefined) document.getElementById("sawah").innerText = data.sawah.toFixed(1) + " cm";
       if (data.tambak !== undefined) document.getElementById("tambak").innerText = data.tambak.toFixed(1) + " cm";
       if (data.voltage !== undefined) document.getElementById("battery").innerText = data.voltage.toFixed(1) + " V";
 
-      // Update Visual Tombol (Hijau/Merah)
+      // 2. Status Tombol (ESP32 mengirim balik status aslinya)
       if (data.pompa1 === "ON") updateButtonUI('p1', 'btn-p1-on'); else updateButtonUI('p1', 'btn-p1-off');
       if (data.pompa2 === "ON") updateButtonUI('p2', 'btn-p2-on'); else updateButtonUI('p2', 'btn-p2-off');
       if (data.aktuator === "BUKA") updateButtonUI('akt', 'btn-akt-buka'); else updateButtonUI('akt', 'btn-akt-tutup');
 
-      // Update Tampilan Durasi Runtime
+      // 3. Durasi Aktif
       if (data.durP1 !== undefined) document.getElementById("durasi-p1").innerText = formatKeWaktu(data.durP1);
       if (data.durP2 !== undefined) document.getElementById("durasi-p2").innerText = formatKeWaktu(data.durP2);
       if (data.durAkt !== undefined) document.getElementById("durasi-akt").innerText = formatKeWaktu(data.durAkt);
 
-      // Update Grafik
+      // 4. Tambah titik baru di Grafik
       if (data.soil !== undefined) updateChartData(soilChart, data.soil, timeNow);
       if (data.sawah !== undefined) updateChartData(sawahChart, data.sawah, timeNow);
       if (data.tambak !== undefined) updateChartData(tambakChart, data.tambak, timeNow);
 
     } catch (error) { 
-      console.error("Gagal memproses JSON:", error); 
+      console.error("Gagal memproses JSON MQTT:", error); 
     }
   }
 });
 
 // ==========================================
-// FUNGSI PENGIRIMAN PERINTAH (PUBLISH)
+// 6. FUNGSI KIRIM PERINTAH KE ESP32
 // ==========================================
 window.setMode = function(mode) { 
   client.publish("sistem/mode", mode); 
@@ -227,10 +264,8 @@ window.setSetting = function() {
     const value = slider.value;
     client.publish("sistem/setting_tinggi", value);
     
-    // Feedback Visual pada UI
+    // Feedback instan pada UI
     const targetStatus = document.getElementById("target-status");
     if(targetStatus) targetStatus.innerText = value;
-    
-    console.log("Kirim target ketinggian:", value);
   }
 };
