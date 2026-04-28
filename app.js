@@ -26,7 +26,7 @@ function getChartOptions() {
   };
 }
 
-// Inisialisasi Chart
+// Inisialisasi Grafik
 const ctxSoil = document.getElementById("soilChart").getContext("2d");
 const soilChart = new Chart(ctxSoil, { type: "line", data: { labels: [], datasets: [{ label: "Kelembapan Tanah (%)", data: [], borderColor: "#10b981", backgroundColor: "rgba(16, 185, 129, 0.1)", borderWidth: 2, fill: true, tension: 0.4 }] }, options: getChartOptions() });
 const ctxSawah = document.getElementById("sawahChart").getContext("2d");
@@ -34,7 +34,7 @@ const sawahChart = new Chart(ctxSawah, { type: "line", data: { labels: [], datas
 const ctxTambak = document.getElementById("tambakChart").getContext("2d");
 const tambakChart = new Chart(ctxTambak, { type: "line", data: { labels: [], datasets: [{ label: "Tinggi Tambak (cm)", data: [], borderColor: "#fbbf24", backgroundColor: "rgba(251, 191, 36, 0.1)", borderWidth: 2, fill: true, tension: 0.4 }] }, options: getChartOptions() });
 
-// FUNGSI UPDATE TOMBOL (DIPERBAIKI)
+// FUNGSI UTAMA WARNA TOMBOL
 function updateButtonUI(groupId, activeBtnId) {
   const config = {
     'mode': { on: 'btn-auto', off: 'btn-manual' },
@@ -43,25 +43,22 @@ function updateButtonUI(groupId, activeBtnId) {
     'akt': { on: 'btn-akt-buka', off: 'btn-akt-tutup' }
   };
 
-  const ids = [config[groupId].on, config[groupId].off];
-  ids.forEach(id => {
-    let btn = document.getElementById(id);
-    if(btn) {
-      if(id === activeBtnId) {
-        // Jika ID yang aktif adalah tombol 'ON/Auto/Buka' -> Hijau
-        // Jika ID yang aktif adalah tombol 'OFF/Manual/Tutup' -> Merah
-        btn.className = (id === config[groupId].on) ? 'active-on' : 'active-off';
-      } else {
-        btn.className = '';
-      }
-    }
-  });
-}
+  const cfg = config[groupId];
+  if(!cfg) return;
 
-window.updateSliderValue = function(val) {
-  let sliderVal = document.getElementById("sliderValue");
-  if(sliderVal) sliderVal.innerText = val;
-};
+  const elOn = document.getElementById(cfg.on);
+  const elOff = document.getElementById(cfg.off);
+
+  if(elOn && elOff) {
+    if(activeBtnId === cfg.on) {
+      elOn.className = 'active-on';  // Menjadi Hijau
+      elOff.className = '';
+    } else if(activeBtnId === cfg.off) {
+      elOn.className = '';
+      elOff.className = 'active-off'; // Menjadi Merah
+    }
+  }
+}
 
 function updateChartData(chart, newData, timeStr) {
   chart.data.labels.push(timeStr);
@@ -86,62 +83,56 @@ async function ambilDataAwalDariFirebase() {
         if (row.tambak !== undefined) { tambakChart.data.labels.push(timeOnly); tambakChart.data.datasets[0].data.push(row.tambak); }
       });
       [soilChart, sawahChart, tambakChart].forEach(ch => ch.update());
-
-      const lastRecord = records[records.length - 1];
-      if (lastRecord.soil !== undefined) document.getElementById("soil").innerText = lastRecord.soil + " %";
-      if (lastRecord.sawah !== undefined) document.getElementById("sawah").innerText = lastRecord.sawah.toFixed(1) + " cm";
-      if (lastRecord.tambak !== undefined) document.getElementById("tambak").innerText = lastRecord.tambak.toFixed(1) + " cm";
-      if (lastRecord.voltage !== undefined) document.getElementById("battery").innerText = lastRecord.voltage.toFixed(1) + " V";
+      const last = records[records.length - 1];
+      if (last) {
+        document.getElementById("soil").innerText = last.soil + " %";
+        document.getElementById("sawah").innerText = last.sawah.toFixed(1) + " cm";
+        document.getElementById("tambak").innerText = last.tambak.toFixed(1) + " cm";
+        document.getElementById("battery").innerText = last.voltage.toFixed(1) + " V";
+      }
     }
-  } catch(err) { console.error(err); }
+  } catch(err) { console.error("Firebase Gagal:", err); }
 }
 
-ambilDataAwalDariFirebase();
-
-client.on("connect", function () {
+client.on("connect", () => {
   document.getElementById("conn-status").className = "status-badge"; 
   document.getElementById("status-text").innerText = "TERHUBUNG";
   client.subscribe("sawah/data"); client.subscribe("sistem/mode"); client.subscribe("sistem/setting_tinggi");
 });
 
-client.on("message", function (topic, message) {
-  let rawValue = message.toString();
+client.on("message", (topic, message) => {
+  let msg = message.toString();
   if (topic === "sistem/mode") {
-    if(rawValue === "AUTO") updateButtonUI('mode', 'btn-auto'); else updateButtonUI('mode', 'btn-manual');
-  }
-  if (topic === "sistem/setting_tinggi") {
-    document.getElementById("target-status").innerText = rawValue;
-    document.getElementById("settingSlider").value = rawValue;
-    updateSliderValue(rawValue);
+    updateButtonUI('mode', msg === "AUTO" ? 'btn-auto' : 'btn-manual');
   }
   if (topic === "sawah/data") {
     try {
-      let data = JSON.parse(rawValue);
+      let d = JSON.parse(msg);
       const timeNow = new Date().toLocaleTimeString('id-ID', { hour: "2-digit", minute: "2-digit", second: "2-digit" });
 
-      document.getElementById("soil").innerText = data.soil + " %";
-      document.getElementById("sawah").innerText = data.sawah.toFixed(1) + " cm";
-      document.getElementById("tambak").innerText = data.tambak.toFixed(1) + " cm";
-      document.getElementById("battery").innerText = data.voltage.toFixed(1) + " V";
+      document.getElementById("soil").innerText = d.soil + " %";
+      document.getElementById("sawah").innerText = d.sawah.toFixed(1) + " cm";
+      document.getElementById("tambak").innerText = d.tambak.toFixed(1) + " cm";
+      document.getElementById("battery").innerText = d.voltage.toFixed(1) + " V";
 
-      if (data.pompa1 === "ON") updateButtonUI('p1', 'btn-p1-on'); else updateButtonUI('p1', 'btn-p1-off');
-      if (data.pompa2 === "ON") updateButtonUI('p2', 'btn-p2-on'); else updateButtonUI('p2', 'btn-p2-off');
-      if (data.aktuator === "BUKA") updateButtonUI('akt', 'btn-akt-buka'); else updateButtonUI('akt', 'btn-akt-tutup');
+      updateButtonUI('p1', d.pompa1 === "ON" ? 'btn-p1-on' : 'btn-p1-off');
+      updateButtonUI('p2', d.pompa2 === "ON" ? 'btn-p2-on' : 'btn-p2-off');
+      updateButtonUI('akt', (d.aktuator === "BUKA" || d.aktuator === "OPEN") ? 'btn-akt-buka' : 'btn-akt-tutup');
 
-      document.getElementById("durasi-p1").innerText = formatKeWaktu(data.durP1 || 0);
-      document.getElementById("durasi-p2").innerText = formatKeWaktu(data.durP2 || 0);
-      document.getElementById("durasi-akt").innerText = formatKeWaktu(data.durAkt || 0);
+      document.getElementById("durasi-p1").innerText = formatKeWaktu(d.durP1 || 0);
+      document.getElementById("durasi-p2").innerText = formatKeWaktu(d.durP2 || 0);
+      document.getElementById("durasi-akt").innerText = formatKeWaktu(d.durAkt || 0);
 
-      updateChartData(soilChart, data.soil, timeNow);
-      updateChartData(sawahChart, data.sawah, timeNow);
-      updateChartData(tambakChart, data.tambak, timeNow);
-    } catch (e) {}
+      updateChartData(soilChart, d.soil, timeNow);
+      updateChartData(sawahChart, d.sawah, timeNow);
+      updateChartData(tambakChart, d.tambak, timeNow);
+    } catch (e) { console.log("JSON Error"); }
   }
 });
 
-window.setMode = function(mode) { client.publish("sistem/mode", mode); };
-window.sendManual = function(device, state) { client.publish("manual/" + device, state); };
-window.setSetting = function() {
-  let value = document.getElementById("settingSlider").value;
-  client.publish("sistem/setting_tinggi", value);
-};
+window.setMode = (m) => client.publish("sistem/mode", m);
+window.sendManual = (d, s) => client.publish("manual/" + d, s);
+window.updateSliderValue = (v) => { document.getElementById("sliderValue").innerText = v; };
+window.setSetting = () => client.publish("sistem/setting_tinggi", document.getElementById("settingSlider").value);
+
+ambilDataAwalDariFirebase();
