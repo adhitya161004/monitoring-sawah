@@ -20,11 +20,10 @@
     * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Poppins', sans-serif; }
     body { background: radial-gradient(circle at top right, #112240, var(--bg-main)); color: var(--text-main); min-height: 100vh; padding: 20px; }
 
-    header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; padding-bottom: 15px; border-bottom: 1px solid var(--glass-border); flex-wrap: wrap; gap: 15px; }
-    .title-wrapper h1 { font-size: 24px; color: var(--accent-yellow); font-weight: 700; }
-    .status-badge { background: rgba(16, 185, 129, 0.2); color: #10b981; padding: 8px 16px; border-radius: 20px; font-size: 14px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+    header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; padding-bottom: 15px; border-bottom: 1px solid var(--glass-border); }
+    .status-badge { background: rgba(16, 185, 129, 0.2); color: #10b981; padding: 8px 16px; border-radius: 20px; font-weight: 600; font-size: 14px; }
     .status-badge.offline { background: rgba(239, 68, 68, 0.2); color: #ef4444; }
-    .nav-btn { background: rgba(255,255,255,0.1); color: white; padding: 8px 15px; border-radius: 8px; text-decoration: none; font-size: 14px; transition: 0.3s; }
+    .nav-btn { background: rgba(255,255,255,0.1); color: white; padding: 8px 15px; border-radius: 8px; text-decoration: none; font-size: 14px; }
 
     .glass-card { background: var(--glass-bg); backdrop-filter: blur(10px); border: 1px solid var(--glass-border); border-radius: 16px; padding: 20px; }
     .dashboard-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 20px; margin-bottom: 20px; }
@@ -36,14 +35,13 @@
     .control-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
     
     .btn-group { display: flex; gap: 5px; }
-    button { border: none; padding: 8px 15px; border-radius: 8px; font-weight: 600; cursor: pointer; transition: 0.3s; background: rgba(255, 255, 255, 0.1); color: var(--text-main); }
+    button { border: none; padding: 8px 15px; border-radius: 8px; font-weight: 600; cursor: pointer; transition: 0.3s; background: rgba(255, 255, 255, 0.1); color: var(--text-muted); }
     
-    /* Warna Status Tombol */
-    button.active-on { background: var(--status-on) !important; color: white; box-shadow: 0 0 10px rgba(16, 185, 129, 0.4); }
-    button.active-off { background: var(--status-off) !important; color: white; box-shadow: 0 0 10px rgba(239, 68, 68, 0.4); }
+    button.active-on { background: var(--status-on) !important; color: white !important; box-shadow: 0 0 12px var(--status-on); }
+    button.active-off { background: var(--status-off) !important; color: white !important; box-shadow: 0 0 12px var(--status-off); }
 
     .slider-container { margin: 25px 0; display: flex; align-items: center; gap: 15px; }
-    input[type=range] { flex: 1; accent-color: var(--accent-yellow); }
+    input[type=range] { flex: 1; accent-color: var(--accent-yellow); cursor: pointer; }
     .device-val { font-family: monospace; font-size: 16px; color: var(--accent-yellow); background: rgba(0,0,0,0.3); padding: 4px 10px; border-radius: 6px; }
   </style>
 </head>
@@ -53,7 +51,7 @@
     <div style="display: flex; gap: 15px; align-items: center;">
       <a href="riwayat.html" class="nav-btn"><i class="fa-solid fa-table"></i> Database</a>
       <div class="status-badge offline" id="conn-status">
-        <i class="fa-solid fa-wifi"></i> <span id="status-text">Menghubungkan...</span>
+        <i class="fa-solid fa-wifi"></i> <span id="status-text">OFFLINE</span>
       </div>
     </div>
   </header>
@@ -67,7 +65,7 @@
 
   <div class="control-grid">
     <div class="glass-card">
-      <div style="color:var(--accent-yellow); margin-bottom:15px;">Kontrol Manual</div>
+      <div style="color:var(--accent-yellow); margin-bottom:15px; font-weight:600;">Kontrol Manual</div>
       <div class="control-row">
         <span>Mode</span>
         <div class="btn-group">
@@ -93,26 +91,26 @@
         <span>Aktuator</span>
         <div class="btn-group">
           <button id="btn-akt-buka" onclick="sendManual('aktuator', 'BUKA')">OPEN</button>
-          <button id="btn-akt-tutup" onclick="sendManual('aktuator', 'CLOSE')">CLOSE</button>
+          <button id="btn-akt-tutup" onclick="sendManual('aktuator', 'TUTUP')">CLOSE</button>
         </div>
       </div>
     </div>
 
     <div class="glass-card">
-      <div style="color:var(--accent-yellow); margin-bottom:15px;">Durasi Aktif</div>
+      <div style="color:var(--accent-yellow); margin-bottom:15px; font-weight:600;">Durasi Aktif</div>
       <div class="control-row"><span>P1</span><span id="durasi-p1" class="device-val">00:00:00</span></div>
       <div class="control-row"><span>P2</span><span id="durasi-p2" class="device-val">00:00:00</span></div>
       <div class="control-row"><span>Akt</span><span id="durasi-akt" class="device-val">00:00:00</span></div>
     </div>
 
     <div class="glass-card">
-      <div style="color:var(--accent-yellow); margin-bottom:15px;">Target Tinggi Sawah</div>
+      <div style="color:var(--accent-yellow); margin-bottom:15px; font-weight:600;">Target Tinggi Sawah</div>
       <div class="slider-container">
         <span>0 cm</span><input type="range" id="settingSlider" min="0" max="30" value="14" oninput="updateSliderValue(this.value)"><span>30 cm</span>
       </div>
-      <div style="text-align: center;"><span id="sliderValue" style="font-size:24px; color:var(--accent-yellow);">14</span> cm</div>
-      <button onclick="setSetting()" style="background:var(--accent-blue); width:100%; margin-top:10px;">KIRIM</button>
-      <p style="text-align:center; font-size:12px; margin-top:5px;">Tersimpan: <span id="target-status">--</span> cm</p>
+      <div style="text-align: center;"><span id="sliderValue" style="font-size:24px; font-weight:bold; color:var(--accent-yellow);">14</span> cm</div>
+      <button onclick="setSetting()" style="background:var(--accent-blue); color:white; width:100%; margin-top:10px; padding:12px;">KIRIM TARGET</button>
+      <p style="text-align:center; font-size:12px; margin-top:8px;">Tersimpan: <span id="target-status">--</span> cm</p>
     </div>
   </div>
 
