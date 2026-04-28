@@ -4,8 +4,10 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Monitoring Sawah by ARNF</title>
+  
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
   <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8"></script>
@@ -13,82 +15,251 @@
   
   <style>
     :root {
-      --bg-main: #0a192f; --glass-bg: rgba(255, 255, 255, 0.05); --glass-border: rgba(255, 255, 255, 0.1);
-      --text-main: #e2e8f0; --text-muted: #94a3b8; --accent-yellow: #fbbf24;
-      --accent-blue: #3b82f6; --status-on: #10b981; --status-off: #ef4444;
+      --bg-main: #0a192f; 
+      --glass-bg: rgba(255, 255, 255, 0.05); 
+      --glass-border: rgba(255, 255, 255, 0.1);
+      --text-main: #e2e8f0; 
+      --text-muted: #94a3b8; 
+      --accent-yellow: #fbbf24;
+      --accent-blue: #3b82f6; 
+      --status-on: #10b981; 
+      --status-off: #ef4444;
     }
-    * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Poppins', sans-serif; }
-    body { background: radial-gradient(circle at top right, #112240, var(--bg-main)); color: var(--text-main); min-height: 100vh; padding: 20px; }
+    
+    * { 
+      margin: 0; 
+      padding: 0; 
+      box-sizing: border-box; 
+      font-family: 'Poppins', sans-serif; 
+    }
+    
+    body { 
+      background: radial-gradient(circle at top right, #112240, var(--bg-main)); 
+      color: var(--text-main); 
+      min-height: 100vh; 
+      padding: 20px; 
+    }
 
-    header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; padding-bottom: 15px; border-bottom: 1px solid var(--glass-border); }
-    .status-badge { background: rgba(16, 185, 129, 0.2); color: #10b981; padding: 8px 16px; border-radius: 20px; font-weight: 600; font-size: 14px; }
-    .status-badge.offline { background: rgba(239, 68, 68, 0.2); color: #ef4444; }
-    .nav-btn { background: rgba(255,255,255,0.1); color: white; padding: 8px 15px; border-radius: 8px; text-decoration: none; font-size: 14px; }
+    /* HEADER */
+    header { 
+      display: flex; 
+      justify-content: space-between; 
+      align-items: center; 
+      margin-bottom: 30px; 
+      padding-bottom: 15px; 
+      border-bottom: 1px solid var(--glass-border); 
+      flex-wrap: wrap; 
+      gap: 15px; 
+    }
+    .title-wrapper h1 { 
+      font-size: 24px; 
+      color: var(--accent-yellow); 
+      font-weight: 700; 
+    }
+    .title-wrapper i { 
+      color: #10b981; 
+      margin-right: 8px; 
+    }
+    
+    .status-badge { 
+      background: rgba(16, 185, 129, 0.2); 
+      color: #10b981; 
+      padding: 8px 16px; 
+      border-radius: 20px; 
+      font-size: 14px; 
+      font-weight: 600; 
+      display: flex; 
+      align-items: center; 
+      gap: 8px; 
+    }
+    .status-badge.offline { 
+      background: rgba(239, 68, 68, 0.2); 
+      color: #ef4444; 
+    }
+    
+    .nav-btn { 
+      background: rgba(255,255,255,0.1); 
+      color: white; 
+      padding: 8px 15px; 
+      border-radius: 8px; 
+      text-decoration: none; 
+      font-size: 14px; 
+      transition: 0.3s; 
+    }
+    .nav-btn:hover { 
+      background: rgba(255,255,255,0.2); 
+    }
 
-    .glass-card { background: var(--glass-bg); backdrop-filter: blur(10px); border: 1px solid var(--glass-border); border-radius: 16px; padding: 20px; }
-    .dashboard-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 20px; margin-bottom: 20px; }
+    /* KARTU KACA (GLASSMORPHISM) */
+    .glass-card { 
+      background: var(--glass-bg); 
+      backdrop-filter: blur(10px); 
+      -webkit-backdrop-filter: blur(10px); 
+      border: 1px solid var(--glass-border); 
+      border-radius: 16px; 
+      padding: 20px; 
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); 
+    }
+    
+    /* GRID SENSOR */
+    .dashboard-grid { 
+      display: grid; 
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); 
+      gap: 20px; 
+      margin-bottom: 20px; 
+    }
     .sensor-card { text-align: center; }
-    .sensor-value { font-size: 36px; font-weight: 700; color: var(--accent-yellow); }
+    .sensor-title { 
+      font-size: 14px; 
+      color: var(--text-muted); 
+      font-weight: 600; 
+      text-transform: uppercase; 
+      letter-spacing: 1px; 
+      margin-bottom: 15px; 
+    }
+    .sensor-icon { 
+      font-size: 40px; 
+      margin-bottom: 10px; 
+      color: var(--accent-blue); 
+    }
+    .sensor-icon.soil { color: #10b981; } 
+    .sensor-icon.batt { color: var(--accent-yellow); }
+    .sensor-value { 
+      font-size: 36px; 
+      font-weight: 700; 
+      color: var(--accent-yellow); 
+    }
 
-    .control-grid { display: grid; grid-template-columns: 1fr 1fr 2fr; gap: 20px; margin-bottom: 20px; }
-    @media (max-width: 1024px) { .control-grid { grid-template-columns: 1fr; } }
-    .control-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+    /* KONTROL MANUAL & DURASI */
+    .control-grid { 
+      display: grid; 
+      grid-template-columns: 1fr 1fr 2fr; 
+      gap: 20px; 
+      margin-bottom: 20px; 
+    }
+    @media (max-width: 1024px) { 
+      .control-grid { grid-template-columns: 1fr; } 
+    }
     
+    .control-row { 
+      display: flex; 
+      justify-content: space-between; 
+      align-items: center; 
+      margin-bottom: 15px; 
+    }
+    .control-row span { font-size: 15px; font-weight: 600; }
+    
+    /* TOMBOL KONTROL */
     .btn-group { display: flex; gap: 5px; }
-    button { border: none; padding: 8px 15px; border-radius: 8px; font-weight: 600; cursor: pointer; transition: 0.3s; background: rgba(255, 255, 255, 0.1); color: var(--text-muted); }
+    button { 
+      border: none; 
+      padding: 8px 15px; 
+      border-radius: 8px; 
+      font-weight: 600; 
+      cursor: pointer; 
+      transition: 0.3s; 
+      background: rgba(255, 255, 255, 0.1); 
+      color: var(--text-main); 
+    }
+    button:hover { background: rgba(255, 255, 255, 0.2); }
     
-    button.active-on { background: var(--status-on) !important; color: white !important; box-shadow: 0 0 12px var(--status-on); }
-    button.active-off { background: var(--status-off) !important; color: white !important; box-shadow: 0 0 12px var(--status-off); }
+    /* WARNA TOMBOL AKTIF */
+    button.active-on { 
+      background: var(--status-on) !important; 
+      color: white !important; 
+      box-shadow: 0 0 10px rgba(16, 185, 129, 0.4); 
+    }
+    button.active-off { 
+      background: var(--status-off) !important; 
+      color: white !important; 
+      box-shadow: 0 0 10px rgba(239, 68, 68, 0.4);
+    }
 
+    /* SLIDER & TARGET */
     .slider-container { margin: 25px 0; display: flex; align-items: center; gap: 15px; }
     input[type=range] { flex: 1; accent-color: var(--accent-yellow); cursor: pointer; }
+    .target-val { font-size: 24px; font-weight: bold; color: var(--accent-yellow); min-width: 80px; text-align: right; }
+    .btn-kirim { 
+      background: var(--accent-blue); 
+      color: white; 
+      padding: 10px 20px; 
+      font-size: 16px; 
+      width: 100%; 
+      margin-top: 10px; 
+    }
+    .btn-kirim:hover { background: #2563eb; }
+
+    /* GRAFIK */
+    .chart-section { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; }
+    .chart-box { height: 250px; cursor: ew-resize; }
+    .section-title { font-size: 18px; font-weight: 600; color: var(--accent-yellow); margin-bottom: 15px; display: flex; align-items: center; gap: 10px; }
     .device-val { font-family: monospace; font-size: 16px; color: var(--accent-yellow); background: rgba(0,0,0,0.3); padding: 4px 10px; border-radius: 6px; }
   </style>
 </head>
 <body>
+
   <header>
-    <div class="title-wrapper"><h1><i class="fa-solid fa-wheat-awn"></i> Monitoring Sawah by ARNF</h1></div>
+    <div class="title-wrapper">
+      <h1><i class="fa-solid fa-wheat-awn"></i> Monitoring Sawah by ARNF</h1>
+    </div>
     <div style="display: flex; gap: 15px; align-items: center;">
-      <a href="riwayat.html" class="nav-btn"><i class="fa-solid fa-table"></i> Database</a>
+      <a href="riwayat.html" class="nav-btn"><i class="fa-solid fa-table"></i> Database & Export</a>
       <div class="status-badge offline" id="conn-status">
-        <i class="fa-solid fa-wifi"></i> <span id="status-text">OFFLINE</span>
+        <i class="fa-solid fa-wifi"></i> <span id="status-text">Menghubungkan...</span>
       </div>
     </div>
   </header>
 
   <div class="dashboard-grid">
-    <div class="glass-card sensor-card"><div>Kelembapan Tanah</div><div class="sensor-value" id="soil">-- %</div></div>
-    <div class="glass-card sensor-card"><div>Tinggi Sawah</div><div class="sensor-value" id="sawah">-- cm</div></div>
-    <div class="glass-card sensor-card"><div>Tinggi Tambak</div><div class="sensor-value" id="tambak">-- cm</div></div>
-    <div class="glass-card sensor-card"><div>Tegangan Sistem</div><div class="sensor-value" id="battery">-- V</div></div>
+    <div class="glass-card sensor-card">
+      <div class="sensor-title">Kelembapan Tanah</div>
+      <div class="sensor-icon soil"><i class="fa-solid fa-droplet"></i></div>
+      <div class="sensor-value" id="soil">-- %</div>
+    </div>
+    <div class="glass-card sensor-card">
+      <div class="sensor-title">Tinggi Sawah</div>
+      <div class="sensor-icon"><i class="fa-solid fa-water"></i></div>
+      <div class="sensor-value" id="sawah">-- cm</div>
+    </div>
+    <div class="glass-card sensor-card">
+      <div class="sensor-title">Tinggi Tambak</div>
+      <div class="sensor-icon"><i class="fa-solid fa-water"></i></div>
+      <div class="sensor-value" id="tambak">-- cm</div>
+    </div>
+    <div class="glass-card sensor-card">
+      <div class="sensor-title">Tegangan Sistem</div>
+      <div class="sensor-icon batt"><i class="fa-solid fa-bolt"></i></div>
+      <div class="sensor-value" id="battery">-- V</div>
+    </div>
   </div>
 
   <div class="control-grid">
+    
     <div class="glass-card">
-      <div style="color:var(--accent-yellow); margin-bottom:15px; font-weight:600;">Kontrol Manual</div>
-      <div class="control-row">
-        <span>Mode</span>
+      <div class="section-title"><i class="fa-solid fa-sliders"></i> Kontrol Manual</div>
+      <div class="control-row" style="border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom:15px; margin-bottom:15px;">
+        <span style="color: var(--accent-yellow);">Mode Sistem</span>
         <div class="btn-group">
           <button id="btn-auto" onclick="setMode('AUTO')">AUTO</button>
           <button id="btn-manual" onclick="setMode('MANUAL')">MANUAL</button>
         </div>
       </div>
       <div class="control-row">
-        <span>Pompa 1</span>
+        <span><i class="fa-solid fa-pump-water" style="color:#3b82f6;"></i> Pompa 1</span>
         <div class="btn-group">
           <button id="btn-p1-on" onclick="sendManual('pompa1', 'ON')">ON</button>
           <button id="btn-p1-off" onclick="sendManual('pompa1', 'OFF')">OFF</button>
         </div>
       </div>
       <div class="control-row">
-        <span>Pompa 2</span>
+        <span><i class="fa-solid fa-pump-water" style="color:#3b82f6;"></i> Pompa 2</span>
         <div class="btn-group">
           <button id="btn-p2-on" onclick="sendManual('pompa2', 'ON')">ON</button>
           <button id="btn-p2-off" onclick="sendManual('pompa2', 'OFF')">OFF</button>
         </div>
       </div>
       <div class="control-row">
-        <span>Aktuator</span>
+        <span><i class="fa-solid fa-door-open" style="color:#fbbf24;"></i> Aktuator</span>
         <div class="btn-group">
           <button id="btn-akt-buka" onclick="sendManual('aktuator', 'BUKA')">OPEN</button>
           <button id="btn-akt-tutup" onclick="sendManual('aktuator', 'TUTUP')">CLOSE</button>
@@ -97,30 +268,47 @@
     </div>
 
     <div class="glass-card">
-      <div style="color:var(--accent-yellow); margin-bottom:15px; font-weight:600;">Durasi Aktif</div>
-      <div class="control-row"><span>P1</span><span id="durasi-p1" class="device-val">00:00:00</span></div>
-      <div class="control-row"><span>P2</span><span id="durasi-p2" class="device-val">00:00:00</span></div>
-      <div class="control-row"><span>Akt</span><span id="durasi-akt" class="device-val">00:00:00</span></div>
+      <div class="section-title"><i class="fa-solid fa-hourglass-half"></i> Durasi Aktif Hari Ini</div>
+      <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 20px;">*Waktu berjalan otomatis direset tiap jam 00:00</p>
+      <div class="control-row"><span>Durasi Pompa 1</span><span id="durasi-p1" class="device-val">00:00:00</span></div>
+      <div class="control-row"><span>Durasi Pompa 2</span><span id="durasi-p2" class="device-val">00:00:00</span></div>
+      <div class="control-row" style="margin-bottom:0;"><span>Durasi Aktuator</span><span id="durasi-akt" class="device-val">00:00:00</span></div>
     </div>
 
     <div class="glass-card">
-      <div style="color:var(--accent-yellow); margin-bottom:15px; font-weight:600;">Target Tinggi Sawah</div>
+      <div class="section-title"><i class="fa-solid fa-bullseye"></i> Target Tinggi Sawah</div>
+      <p style="color: var(--text-muted); font-size: 14px;">Geser batas ketinggian air sawah. Pompa akan mempertahankan air di angka ini.</p>
+      
       <div class="slider-container">
-        <span>0 cm</span><input type="range" id="settingSlider" min="0" max="30" value="14" oninput="updateSliderValue(this.value)"><span>30 cm</span>
+        <span style="font-size: 14px;">0 cm</span>
+        <input type="range" id="settingSlider" min="0" max="30" value="14" oninput="updateSliderValue(this.value)">
+        <span style="font-size: 14px;">30 cm</span>
       </div>
-      <div style="text-align: center;"><span id="sliderValue" style="font-size:24px; font-weight:bold; color:var(--accent-yellow);">14</span> cm</div>
-      <button onclick="setSetting()" style="background:var(--accent-blue); color:white; width:100%; margin-top:10px; padding:12px;">KIRIM TARGET</button>
-      <p style="text-align:center; font-size:12px; margin-top:8px;">Tersimpan: <span id="target-status">--</span> cm</p>
+      
+      <div style="text-align: center; margin-bottom: 15px;">
+        <span class="target-val"><span id="sliderValue">14</span> cm</span>
+      </div>
+      
+      <button class="btn-kirim" onclick="setSetting()">KIRIM TARGET PENGATURAN</button>
+      <p style="text-align: center; margin-top: 15px; font-size: 14px;">Target Tersimpan: <strong id="target-status" style="color:var(--accent-yellow);">--</strong> cm</p>
+    </div>
+
+  </div>
+
+  <div class="glass-card" style="margin-bottom: 30px;">
+    <div class="section-title" style="justify-content: space-between;">
+      <span><i class="fa-solid fa-chart-line"></i> Tren Pemantauan 24 Jam Terakhir</span>
+      <span style="font-size: 12px; color: var(--text-muted); font-weight: normal;"><i class="fa-solid fa-hand-pointer"></i> Geser / Scroll grafik untuk Zoom</span>
+    </div>
+    
+    <div class="chart-section">
+      <div class="chart-box"><canvas id="soilChart"></canvas></div>
+      <div class="chart-box"><canvas id="sawahChart"></canvas></div>
+      <div class="chart-box"><canvas id="tambakChart"></canvas></div>
     </div>
   </div>
 
-  <div class="glass-card">
-    <div class="chart-section" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px;">
-      <div style="height:250px;"><canvas id="soilChart"></canvas></div>
-      <div style="height:250px;"><canvas id="sawahChart"></canvas></div>
-      <div style="height:250px;"><canvas id="tambakChart"></canvas></div>
-    </div>
-  </div>
   <script src="app.js"></script>
+
 </body>
 </html>
