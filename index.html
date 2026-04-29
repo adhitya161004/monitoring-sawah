@@ -5,9 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Monitoring Sawah by ARNF</title>
   
+  <!-- Font & Icon -->
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   
+  <!-- Library Pendukung -->
   <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8"></script>
@@ -26,178 +28,59 @@
       --status-off: #ef4444;
     }
     
-    * { 
-      margin: 0; 
-      padding: 0; 
-      box-sizing: border-box; 
-      font-family: 'Poppins', sans-serif; 
-    }
-    
-    body { 
-      background: radial-gradient(circle at top right, #112240, var(--bg-main)); 
-      color: var(--text-main); 
-      min-height: 100vh; 
-      padding: 20px; 
-    }
+    * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Poppins', sans-serif; }
+    body { background: radial-gradient(circle at top right, #112240, var(--bg-main)); color: var(--text-main); min-height: 100vh; padding: 20px; }
 
     /* HEADER */
-    header { 
-      display: flex; 
-      justify-content: space-between; 
-      align-items: center; 
-      margin-bottom: 30px; 
-      padding-bottom: 15px; 
-      border-bottom: 1px solid var(--glass-border); 
-      flex-wrap: wrap; 
-      gap: 15px; 
-    }
-    .title-wrapper h1 { 
-      font-size: 24px; 
-      color: var(--accent-yellow); 
-      font-weight: 700; 
-    }
-    .title-wrapper i { 
-      color: #10b981; 
-      margin-right: 8px; 
-    }
-    
-    .status-badge { 
-      background: rgba(16, 185, 129, 0.2); 
-      color: #10b981; 
-      padding: 8px 16px; 
-      border-radius: 20px; 
-      font-size: 14px; 
-      font-weight: 600; 
-      display: flex; 
-      align-items: center; 
-      gap: 8px; 
-    }
-    .status-badge.offline { 
-      background: rgba(239, 68, 68, 0.2); 
-      color: #ef4444; 
-    }
-    
-    .nav-btn { 
-      background: rgba(255,255,255,0.1); 
-      color: white; 
-      padding: 8px 15px; 
-      border-radius: 8px; 
-      text-decoration: none; 
-      font-size: 14px; 
-      transition: 0.3s; 
-    }
-    .nav-btn:hover { 
-      background: rgba(255,255,255,0.2); 
-    }
+    header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; padding-bottom: 15px; border-bottom: 1px solid var(--glass-border); flex-wrap: wrap; gap: 15px; }
+    .title-wrapper h1 { font-size: 24px; color: var(--accent-yellow); font-weight: 700; }
+    .title-wrapper i { color: #10b981; margin-right: 8px; }
+    .status-badge { background: rgba(16, 185, 129, 0.2); color: #10b981; padding: 8px 16px; border-radius: 20px; font-size: 14px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+    .status-badge.offline { background: rgba(239, 68, 68, 0.2); color: #ef4444; }
+    .nav-btn { background: rgba(255,255,255,0.1); color: white; padding: 8px 15px; border-radius: 8px; text-decoration: none; font-size: 14px; transition: 0.3s; }
+    .nav-btn:hover { background: rgba(255,255,255,0.2); }
 
-    /* KARTU KACA (GLASSMORPHISM) */
-    .glass-card { 
-      background: var(--glass-bg); 
-      backdrop-filter: blur(10px); 
-      -webkit-backdrop-filter: blur(10px); 
-      border: 1px solid var(--glass-border); 
-      border-radius: 16px; 
-      padding: 20px; 
-      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); 
-    }
+    /* GLASS CARD */
+    .glass-card { background: var(--glass-bg); backdrop-filter: blur(10px); border: 1px solid var(--glass-border); border-radius: 16px; padding: 20px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); }
     
     /* GRID SENSOR */
-    .dashboard-grid { 
-      display: grid; 
-      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); 
-      gap: 20px; 
-      margin-bottom: 20px; 
-    }
+    .dashboard-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 20px; margin-bottom: 20px; }
     .sensor-card { text-align: center; }
-    .sensor-title { 
-      font-size: 14px; 
-      color: var(--text-muted); 
-      font-weight: 600; 
-      text-transform: uppercase; 
-      letter-spacing: 1px; 
-      margin-bottom: 15px; 
-    }
-    .sensor-icon { 
-      font-size: 40px; 
-      margin-bottom: 10px; 
-      color: var(--accent-blue); 
-    }
-    .sensor-icon.soil { color: #10b981; } 
-    .sensor-icon.batt { color: var(--accent-yellow); }
-    .sensor-value { 
-      font-size: 36px; 
-      font-weight: 700; 
-      color: var(--accent-yellow); 
-    }
+    .sensor-title { font-size: 14px; color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 15px; }
+    .sensor-icon { font-size: 40px; margin-bottom: 10px; color: var(--accent-blue); }
+    .sensor-icon.soil { color: #10b981; } .sensor-icon.batt { color: var(--accent-yellow); }
+    .sensor-value { font-size: 36px; font-weight: 700; color: var(--accent-yellow); }
 
     /* KONTROL MANUAL & DURASI */
-    .control-grid { 
-      display: grid; 
-      grid-template-columns: 1fr 1fr 2fr; 
-      gap: 20px; 
-      margin-bottom: 20px; 
-    }
-    @media (max-width: 1024px) { 
-      .control-grid { grid-template-columns: 1fr; } 
-    }
-    
-    .control-row { 
-      display: flex; 
-      justify-content: space-between; 
-      align-items: center; 
-      margin-bottom: 15px; 
-    }
-    .control-row span { font-size: 15px; font-weight: 600; }
+    .control-grid { display: grid; grid-template-columns: 1fr 1fr 2fr; gap: 20px; margin-bottom: 20px; }
+    @media (max-width: 1024px) { .control-grid { grid-template-columns: 1fr; } }
+    .control-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+    .control-row span { font-size: 14px; font-weight: 600; }
     
     /* TOMBOL KONTROL */
     .btn-group { display: flex; gap: 5px; }
-    button { 
-      border: none; 
-      padding: 8px 15px; 
-      border-radius: 8px; 
-      font-weight: 600; 
-      cursor: pointer; 
-      transition: 0.3s; 
-      background: rgba(255, 255, 255, 0.1); 
-      color: var(--text-main); 
-    }
+    button { border: none; padding: 8px 15px; border-radius: 8px; font-weight: 600; cursor: pointer; transition: 0.3s; background: rgba(255, 255, 255, 0.1); color: var(--text-main); }
     button:hover { background: rgba(255, 255, 255, 0.2); }
-    
-    /* WARNA TOMBOL AKTIF */
-    button.active-on { 
-      background: var(--status-on) !important; 
-      color: white !important; 
-      box-shadow: 0 0 10px rgba(16, 185, 129, 0.4); 
-    }
-    button.active-off { 
-      background: var(--status-off) !important; 
-      color: white !important; 
-      box-shadow: 0 0 10px rgba(239, 68, 68, 0.4);
-    }
+    button.active-on { background: var(--status-on) !important; color: white !important; box-shadow: 0 0 10px rgba(16, 185, 129, 0.4); }
+    button.active-off { background: var(--status-off) !important; color: white !important; box-shadow: 0 0 10px rgba(239, 68, 68, 0.4); }
 
     /* SLIDER & TARGET */
     .slider-container { margin: 25px 0; display: flex; align-items: center; gap: 15px; }
     input[type=range] { flex: 1; accent-color: var(--accent-yellow); cursor: pointer; }
     .target-val { font-size: 24px; font-weight: bold; color: var(--accent-yellow); min-width: 80px; text-align: right; }
-    .btn-kirim { 
-      background: var(--accent-blue); 
-      color: white; 
-      padding: 10px 20px; 
-      font-size: 16px; 
-      width: 100%; 
-      margin-top: 10px; 
-    }
+    .btn-kirim { background: var(--accent-blue); color: white; padding: 10px 20px; font-size: 16px; width: 100%; margin-top: 10px; }
     .btn-kirim:hover { background: #2563eb; }
 
     /* GRAFIK */
     .chart-section { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; }
     .chart-box { height: 250px; cursor: ew-resize; }
-    .section-title { font-size: 18px; font-weight: 600; color: var(--accent-yellow); margin-bottom: 15px; display: flex; align-items: center; gap: 10px; }
-    .device-val { font-family: monospace; font-size: 16px; color: var(--accent-yellow); background: rgba(0,0,0,0.3); padding: 4px 10px; border-radius: 6px; }
+    .section-title { font-size: 16px; font-weight: 600; color: var(--accent-yellow); margin-bottom: 15px; display: flex; align-items: center; gap: 10px; }
+    .device-val { font-family: monospace; font-size: 14px; color: var(--accent-yellow); background: rgba(0,0,0,0.3); padding: 4px 10px; border-radius: 6px; }
   </style>
 </head>
 <body>
 
+  <!-- HEADER -->
   <header>
     <div class="title-wrapper">
       <h1><i class="fa-solid fa-wheat-awn"></i> Monitoring Sawah by ARNF</h1>
@@ -210,6 +93,7 @@
     </div>
   </header>
 
+  <!-- NILAI SENSOR -->
   <div class="dashboard-grid">
     <div class="glass-card sensor-card">
       <div class="sensor-title">Kelembapan Tanah</div>
@@ -233,8 +117,10 @@
     </div>
   </div>
 
+  <!-- KONTROL, DURASI, & TARGET -->
   <div class="control-grid">
     
+    <!-- KONTROL MANUAL -->
     <div class="glass-card">
       <div class="section-title"><i class="fa-solid fa-sliders"></i> Kontrol Manual</div>
       <div class="control-row" style="border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom:15px; margin-bottom:15px;">
@@ -267,21 +153,26 @@
       </div>
     </div>
 
+    <!-- STATISTIK HARIAN -->
     <div class="glass-card">
-      <div class="section-title"><i class="fa-solid fa-hourglass-half"></i> Durasi Aktif Hari Ini</div>
-      <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 20px;">*Waktu berjalan otomatis direset tiap jam 00:00</p>
-      <div class="control-row"><span>Durasi Pompa 1</span><span id="durasi-p1" class="device-val">00:00:00</span></div>
-      <div class="control-row"><span>Durasi Pompa 2</span><span id="durasi-p2" class="device-val">00:00:00</span></div>
-      <div class="control-row" style="margin-bottom:0;"><span>Durasi Aktuator</span><span id="durasi-akt" class="device-val">00:00:00</span></div>
+      <div class="section-title"><i class="fa-solid fa-hourglass-half"></i> Info Harian Alat</div>
+      <p style="font-size: 11px; color: var(--text-muted); margin-bottom: 15px;">*Waktu & frekuensi otomatis direset jam 00:00</p>
+      
+      <div class="control-row"><span>Durasi Pompa 1</span><span id="durasi-p1" class="device-val" style="color:#3b82f6;">00:00:00</span></div>
+      <div class="control-row"><span>Durasi Pompa 2</span><span id="durasi-p2" class="device-val" style="color:#3b82f6;">00:00:00</span></div>
+      <div class="control-row"><span>Waktu Terbuka (Akt)</span><span id="durasi-akt" class="device-val" style="color:#10b981;">00:00:00</span></div>
+      <div class="control-row"><span>Frekuensi Buka</span><span id="cnt-buka" class="device-val" style="color:#fbbf24;">0 Kali</span></div>
+      <div class="control-row" style="margin-bottom:0;"><span>Frekuensi Tutup</span><span id="cnt-tutup" class="device-val" style="color:#ef4444;">0 Kali</span></div>
     </div>
 
+    <!-- TARGET TINGGI SAWAH -->
     <div class="glass-card">
       <div class="section-title"><i class="fa-solid fa-bullseye"></i> Target Tinggi Sawah</div>
-      <p style="color: var(--text-muted); font-size: 14px;">Geser batas ketinggian air sawah. Pompa akan mempertahankan air di angka ini.</p>
+      <p style="color: var(--text-muted); font-size: 13px;">Geser batas ketinggian air sawah. Mode AUTO akan mempertahankan air di angka ini.</p>
       
       <div class="slider-container">
         <span style="font-size: 14px;">0 cm</span>
-        <input type="range" id="settingSlider" min="0" max="30" value="14" oninput="updateSliderValue(this.value)">
+        <input type="range" id="settingSlider" min="0" max="30" value="14" step="0.5" oninput="updateSliderValue(this.value)">
         <span style="font-size: 14px;">30 cm</span>
       </div>
       
@@ -289,16 +180,17 @@
         <span class="target-val"><span id="sliderValue">14</span> cm</span>
       </div>
       
-      <button class="btn-kirim" onclick="setSetting()">KIRIM TARGET PENGATURAN</button>
-      <p style="text-align: center; margin-top: 15px; font-size: 14px;">Target Tersimpan: <strong id="target-status" style="color:var(--accent-yellow);">--</strong> cm</p>
+      <button class="btn-kirim" onclick="setSetting()">KIRIM TARGET</button>
+      <p style="text-align: center; margin-top: 15px; font-size: 13px;">Target Tersimpan: <strong id="target-status" style="color:var(--accent-yellow);">--</strong> cm</p>
     </div>
 
   </div>
 
+  <!-- GRAFIK PEMANTAUAN -->
   <div class="glass-card" style="margin-bottom: 30px;">
     <div class="section-title" style="justify-content: space-between;">
-      <span><i class="fa-solid fa-chart-line"></i> Tren Pemantauan 24 Jam Terakhir</span>
-      <span style="font-size: 12px; color: var(--text-muted); font-weight: normal;"><i class="fa-solid fa-hand-pointer"></i> Geser / Scroll grafik untuk Zoom</span>
+      <span><i class="fa-solid fa-chart-line"></i> Tren Pemantauan Data</span>
+      <span style="font-size: 11px; color: var(--text-muted); font-weight: normal;"><i class="fa-solid fa-hand-pointer"></i> Geser / Scroll grafik untuk Zoom</span>
     </div>
     
     <div class="chart-section">
@@ -309,6 +201,5 @@
   </div>
 
   <script src="app.js"></script>
-
 </body>
 </html>
