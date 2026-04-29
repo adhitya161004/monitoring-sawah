@@ -18,18 +18,19 @@ const MAX_DATA_MEMORY = 2000;
 const TAMPILAN_DILAYAR = 30;  
 
 // ==========================================
-// 2. FUNGSI PENDUKUNG UI & FORMAT
+// 2. FUNGSI PENDUKUNG UI & FORMATTING
 // ==========================================
 
 // Konversi detik ke format HH:MM:SS
 function formatKeWaktu(totalDetik) {
+  if (totalDetik === undefined || totalDetik === null) return "00:00:00";
   const jam = Math.floor(totalDetik / 3600);
   const menit = Math.floor((totalDetik % 3600) / 60);
   const detik = totalDetik % 60;
   return [jam, menit, detik].map(v => v < 10 ? "0" + v : v).join(":");
 }
 
-// Update status warna tombol (Hijau/Merah)
+// Update status warna tombol (Hijau = ON/OPEN/AUTO, Merah = OFF/CLOSE/MANUAL)
 function updateButtonUI(groupId, activeBtnId) {
   const config = {
     'mode': { on: 'btn-auto', off: 'btn-manual' },
@@ -46,15 +47,16 @@ function updateButtonUI(groupId, activeBtnId) {
 
   if(elOn && elOff) {
     if(activeBtnId === cfg.on) {
-      elOn.className = 'active-on';   // Hijau
+      elOn.className = 'active-on';   
       elOff.className = '';
     } else if (activeBtnId === cfg.off) {
       elOn.className = '';
-      elOff.className = 'active-off'; // Merah
+      elOff.className = 'active-off'; 
     }
   }
 }
 
+// Update nilai angka di sebelah slider target
 window.updateSliderValue = function(val) {
   const sliderVal = document.getElementById("sliderValue");
   if(sliderVal) sliderVal.innerText = val;
@@ -89,7 +91,10 @@ const tambakChart = new Chart(ctxTambak, { type: "line", data: { labels: [], dat
 function updateChartData(chart, newData, timeStr) {
   chart.data.labels.push(timeStr);
   chart.data.datasets[0].data.push(newData);
-  if (chart.data.labels.length > MAX_DATA_MEMORY) { chart.data.labels.shift(); chart.data.datasets[0].data.shift(); }
+  if (chart.data.labels.length > MAX_DATA_MEMORY) { 
+    chart.data.labels.shift(); 
+    chart.data.datasets[0].data.shift(); 
+  }
   let total = chart.data.labels.length;
   chart.options.scales.x.min = total > TAMPILAN_DILAYAR ? total - TAMPILAN_DILAYAR : 0;
   chart.options.scales.x.max = total - 1;
@@ -97,11 +102,11 @@ function updateChartData(chart, newData, timeStr) {
 }
 
 // ==========================================
-// 4. LOAD PERSISTENCE (CEGAH RESET SAAT REFRESH)
+// 4. LOAD PERSISTENCE DARI FIREBASE (SAAT REFRESH)
 // ==========================================
 async function ambilDataAwalDariFirebase() {
   try {
-    // A. Ambil Konfigurasi Terakhir (Mode & Target)
+    // A. Ambil Konfigurasi Mode & Target
     const resConfig = await fetch(configURL);
     const configData = await resConfig.json();
     if (configData) {
@@ -113,7 +118,7 @@ async function ambilDataAwalDariFirebase() {
       }
     }
 
-    // B. Ambil Riwayat Data
+    // B. Ambil Riwayat Data Sensor & Durasi Harian
     const response = await fetch(firebaseREST);
     const data = await response.json();
     if (data) {
@@ -124,72 +129,98 @@ async function ambilDataAwalDariFirebase() {
         if (row.sawah !== undefined) { sawahChart.data.labels.push(timeOnly); sawahChart.data.datasets[0].data.push(row.sawah); }
         if (row.tambak !== undefined) { tambakChart.data.labels.push(timeOnly); tambakChart.data.datasets[0].data.push(row.tambak); }
       });
+      
       [soilChart, sawahChart, tambakChart].forEach(ch => ch.update());
 
+      // Ambil Baris Data Terakhir untuk Tampilan Dashboard
       const last = records[records.length - 1];
       if (last) {
-        document.getElementById("soil").innerText = last.soil + " %";
-        document.getElementById("sawah").innerText = last.sawah.toFixed(1) + " cm";
-        document.getElementById("tambak").innerText = last.tambak.toFixed(1) + " cm";
-        document.getElementById("battery").innerText = last.voltage.toFixed(1) + " V";
+        // Sensor
+        document.getElementById("soil").innerText = (last.soil !== undefined ? last.soil : 0) + " %";
+        document.getElementById("sawah").innerText = (last.sawah !== undefined ? last.sawah.toFixed(1) : 0) + " cm";
+        document.getElementById("tambak").innerText = (last.tambak !== undefined ? last.tambak.toFixed(1) : 0) + " cm";
+        document.getElementById("battery").innerText = (last.voltage !== undefined ? last.voltage.toFixed(1) : 0) + " V";
         
-        // Load Durasi Terakhir
+        // Durasi & Counter Harian
         if (last.durP1 !== undefined) document.getElementById("durasi-p1").innerText = formatKeWaktu(last.durP1);
         if (last.durP2 !== undefined) document.getElementById("durasi-p2").innerText = formatKeWaktu(last.durP2);
-        if (last.durAkt !== undefined) document.getElementById("durasi-akt").innerText = formatKeWaktu(last.durAkt);
+        if (last.durAktBuka !== undefined) document.getElementById("durasi-akt").innerText = formatKeWaktu(last.durAktBuka);
+        if (last.cntBuka !== undefined) document.getElementById("cnt-buka").innerText = last.cntBuka + " Kali";
+        if (last.cntTutup !== undefined) document.getElementById("cnt-tutup").innerText = last.cntTutup + " Kali";
       }
     }
   } catch(err) { console.error("Error Persistence:", err); }
 }
 
 // ==========================================
-// 5. KONEKSI & PESAN MQTT
+// 5. KONEKSI & PENANGANAN PESAN MQTT (REAL-TIME)
 // ==========================================
 client.on("connect", () => {
   document.getElementById("conn-status").className = "status-badge";
   document.getElementById("status-text").innerText = "TERHUBUNG";
-  client.subscribe("sawah/data"); client.subscribe("sistem/mode"); client.subscribe("sistem/setting_tinggi");
+  client.subscribe("sawah/data"); 
+  client.subscribe("sistem/mode"); 
+  client.subscribe("sistem/setting_tinggi");
+});
+
+client.on("error", () => {
+  document.getElementById("conn-status").className = "status-badge offline";
+  document.getElementById("status-text").innerText = "KONEKSI TERPUTUS";
 });
 
 client.on("message", (topic, message) => {
   let msg = message.toString();
+  
   if (topic === "sistem/mode") updateButtonUI('mode', msg === "AUTO" ? 'btn-auto' : 'btn-manual');
+  
   if (topic === "sistem/setting_tinggi") {
     document.getElementById("target-status").innerText = msg;
     document.getElementById("settingSlider").value = msg;
     document.getElementById("sliderValue").innerText = msg;
   }
+  
   if (topic === "sawah/data") {
     try {
       let d = JSON.parse(msg);
       const timeNow = new Date().toLocaleTimeString('id-ID', { hour: "2-digit", minute: "2-digit", second: "2-digit" });
 
-      document.getElementById("soil").innerText = d.soil + " %";
-      document.getElementById("sawah").innerText = d.sawah.toFixed(1) + " cm";
-      document.getElementById("tambak").innerText = d.tambak.toFixed(1) + " cm";
-      document.getElementById("battery").innerText = d.voltage.toFixed(1) + " V";
+      // Update Angka Sensor
+      if (d.soil !== undefined) document.getElementById("soil").innerText = d.soil + " %";
+      if (d.sawah !== undefined) document.getElementById("sawah").innerText = d.sawah.toFixed(1) + " cm";
+      if (d.tambak !== undefined) document.getElementById("tambak").innerText = d.tambak.toFixed(1) + " cm";
+      if (d.voltage !== undefined) document.getElementById("battery").innerText = d.voltage.toFixed(1) + " V";
 
+      // Update Status Tombol Manual dari ESP32
       updateButtonUI('p1', d.pompa1 === "ON" ? 'btn-p1-on' : 'btn-p1-off');
       updateButtonUI('p2', d.pompa2 === "ON" ? 'btn-p2-on' : 'btn-p2-off');
       updateButtonUI('akt', d.aktuator === "BUKA" ? 'btn-akt-buka' : 'btn-akt-tutup');
 
+      // Update Durasi Realtime (Data dari MQTT)
       if (d.durP1 !== undefined) document.getElementById("durasi-p1").innerText = formatKeWaktu(d.durP1);
       if (d.durP2 !== undefined) document.getElementById("durasi-p2").innerText = formatKeWaktu(d.durP2);
-      if (d.durAkt !== undefined) document.getElementById("durasi-akt").innerText = formatKeWaktu(d.durAkt);
+      if (d.durAkt !== undefined) document.getElementById("durasi-akt").innerText = formatKeWaktu(d.durAkt); 
 
-      updateChartData(soilChart, d.soil, timeNow);
-      updateChartData(sawahChart, d.sawah, timeNow);
-      updateChartData(tambakChart, d.tambak, timeNow);
-    } catch (e) {}
+      // Update Grafik
+      if (d.soil !== undefined) updateChartData(soilChart, d.soil, timeNow);
+      if (d.sawah !== undefined) updateChartData(sawahChart, d.sawah, timeNow);
+      if (d.tambak !== undefined) updateChartData(tambakChart, d.tambak, timeNow);
+    } catch (e) {
+      console.error("Gagal parse MQTT:", e);
+    }
   }
 });
 
 // ==========================================
-// 6. FUNGSI WINDOW (INTERAKSI USER)
+// 6. FUNGSI PENGIRIMAN PERINTAH KE ESP32
 // ==========================================
 window.setMode = (m) => client.publish("sistem/mode", m);
 window.sendManual = (d, s) => client.publish("manual/" + d, s);
-window.setSetting = () => client.publish("sistem/setting_tinggi", document.getElementById("settingSlider").value);
 
-// Mulai ambil data saat halaman dimuat
+window.setSetting = () => {
+  const sliderValue = document.getElementById("settingSlider").value;
+  client.publish("sistem/setting_tinggi", sliderValue);
+  document.getElementById("target-status").innerText = sliderValue;
+};
+
+// Jalankan fetch saat halaman pertama kali dibuka
 ambilDataAwalDariFirebase();
