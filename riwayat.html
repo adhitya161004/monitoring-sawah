@@ -50,13 +50,14 @@
         <thead>
           <tr>
             <th>Waktu (WIB)</th>
+            <th>Set Ketinggian (cm)</th>
             <th>Sawah (cm)</th>
             <th>Tambak (cm)</th>
             <th>Tanah (%)</th>
             <th>Baterai (V)</th>
             <th>Durasi Pompa 1</th>
             <th>Durasi Pompa 2</th>
-            <th>Waktu Akt Buka</th>
+            <th>Waktu Slr Terbuka</th>
             <th>Jml Buka</th>
             <th>Jml Tutup</th>
           </tr>
@@ -104,6 +105,7 @@
         let tr = document.createElement("tr");
         tr.innerHTML = `
           <td style="font-weight:600; color:white;">${row.waktu || "-"}</td>
+          <td style="color: var(--accent-yellow); font-weight: 600;">${row.setting !== undefined ? row.setting : "0"}</td>
           <td>${row.sawah !== undefined ? row.sawah.toFixed(1) : "0"}</td>
           <td>${row.tambak !== undefined ? row.tambak.toFixed(1) : "0"}</td>
           <td>${row.soil !== undefined ? row.soil : "0"}</td>
@@ -130,16 +132,17 @@
       const dataToExport = selectedDate ? masterData.filter(r => r.waktu && r.waktu.includes(selectedDate)) : masterData;
       if (dataToExport.length === 0) return alert("Tidak ada data untuk di-download!"); 
       
-      let csvContent = "Waktu,Sawah(cm),Tambak(cm),Tanah(%),Baterai(V),Durasi P1,Durasi P2,Waktu Aktuator Terbuka,Jumlah Buka,Jumlah Tutup\n";
+      let csvContent = "Waktu,Set Ketinggian(cm),Sawah(cm),Tambak(cm),Tanah(%),Baterai(V),Durasi P1,Durasi P2,Waktu Slr Terbuka,Jumlah Buka,Jumlah Tutup\n";
       
       dataToExport.forEach(r => {
+        let setting = r.setting !== undefined ? r.setting : "0";
         let sawah = r.sawah !== undefined ? r.sawah : "0";
         let tambak = r.tambak !== undefined ? r.tambak : "0";
         let soil = r.soil !== undefined ? r.soil : "0";
         let voltage = r.voltage !== undefined ? r.voltage : "0";
         let waktu = r.waktu || "";
         
-        csvContent += `${waktu},${sawah},${tambak},${soil},${voltage},${formatWaktu(r.durP1)},${formatWaktu(r.durP2)},${formatWaktu(r.durAktBuka)},${r.cntBuka || 0},${r.cntTutup || 0}\n`;
+        csvContent += `${waktu},${setting},${sawah},${tambak},${soil},${voltage},${formatWaktu(r.durP1)},${formatWaktu(r.durP2)},${formatWaktu(r.durAktBuka)},${r.cntBuka || 0},${r.cntTutup || 0}\n`;
       });
       
       const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
