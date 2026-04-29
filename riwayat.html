@@ -3,325 +3,154 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Riwayat Data - Monitoring Sawah</title>
-  
+  <title>Riwayat Data Lengkap - Monitoring Sawah</title>
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   
   <style>
-    :root {
-      --bg-main: #0a192f;
-      --glass-bg: rgba(255, 255, 255, 0.05);
-      --glass-border: rgba(255, 255, 255, 0.1);
-      --text-main: #e2e8f0;
-      --accent-yellow: #fbbf24;
-      --accent-blue: #3b82f6;
-      --accent-green: #10b981;
-    }
-
-    * { 
-      margin: 0; 
-      padding: 0; 
-      box-sizing: border-box; 
-      font-family: 'Poppins', sans-serif; 
-    }
-    
-    body {
-      background: radial-gradient(circle at top right, #112240, var(--bg-main));
-      color: var(--text-main);
-      min-height: 100vh;
-      padding: 20px;
-    }
-
-    /* HEADER */
-    header {
-      display: flex; 
-      justify-content: space-between; 
-      align-items: center;
-      margin-bottom: 30px; 
-      padding-bottom: 15px; 
-      border-bottom: 1px solid var(--glass-border);
-    }
-    .title-wrapper h1 { 
-      font-size: 24px; 
-      color: var(--accent-yellow); 
-      font-weight: 700; 
-    }
-    
-    .nav-btn {
-      background: rgba(255, 255, 255, 0.1); 
-      color: white; 
-      text-decoration: none;
-      padding: 8px 16px; 
-      border-radius: 8px; 
-      font-weight: 600; 
-      display: flex; 
-      align-items: center; 
-      gap: 8px; 
-      transition: 0.3s;
-    }
-    .nav-btn:hover { 
-      background: rgba(255, 255, 255, 0.2); 
-    }
-
-    /* GLASS CARD */
-    .glass-card {
-      background: var(--glass-bg); 
-      backdrop-filter: blur(10px);
-      border: 1px solid var(--glass-border); 
-      border-radius: 16px; 
-      padding: 20px; 
-      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-    }
-
-    /* FILTER SECTION */
-    .filter-section {
-      display: flex;
-      gap: 15px;
-      align-items: center;
-      margin-bottom: 20px;
-      flex-wrap: wrap;
-      background: rgba(0,0,0,0.2);
-      padding: 15px;
-      border-radius: 10px;
-    }
-
-    input[type="date"] {
-      background: #112240;
-      border: 1px solid var(--glass-border);
-      color: white;
-      padding: 8px;
-      border-radius: 5px;
-      outline: none;
-      font-family: 'Poppins', sans-serif;
-    }
-
-    /* TOMBOL AKSI */
-    .btn-action {
-      background: var(--accent-blue); 
-      color: white; 
-      border: none; 
-      padding: 10px 20px;
-      border-radius: 8px; 
-      font-weight: 600; 
-      cursor: pointer; 
-      display: flex; 
-      align-items: center; 
-      gap: 8px; 
-      transition: 0.3s;
-    }
-    .btn-action:hover { background: #2563eb; }
-    
+    :root { --bg-main: #0a192f; --glass-bg: rgba(255, 255, 255, 0.05); --glass-border: rgba(255, 255, 255, 0.1); --text-main: #e2e8f0; --accent-yellow: #fbbf24; --accent-blue: #3b82f6; --accent-green: #10b981; }
+    * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Poppins', sans-serif; }
+    body { background: radial-gradient(circle at top right, #112240, var(--bg-main)); color: var(--text-main); min-height: 100vh; padding: 20px; }
+    header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; padding-bottom: 15px; border-bottom: 1px solid var(--glass-border); }
+    .nav-btn { background: rgba(255, 255, 255, 0.1); color: white; text-decoration: none; padding: 8px 16px; border-radius: 8px; font-weight: 600; display: flex; align-items: center; gap: 8px; transition: 0.3s; }
+    .glass-card { background: var(--glass-bg); backdrop-filter: blur(10px); border: 1px solid var(--glass-border); border-radius: 16px; padding: 20px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); }
+    .filter-section { display: flex; gap: 15px; align-items: center; margin-bottom: 20px; flex-wrap: wrap; background: rgba(0,0,0,0.2); padding: 15px; border-radius: 10px; }
+    input[type="date"] { background: #112240; border: 1px solid var(--glass-border); color: white; padding: 8px; border-radius: 5px; outline: none; }
+    .btn-action { background: var(--accent-blue); color: white; border: none; padding: 10px 20px; border-radius: 8px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 8px; transition: 0.3s; }
     .btn-action.download { background: var(--accent-green); }
-    .btn-action.download:hover { background: #059669; }
-
-    /* TABEL */
-    .table-wrapper { 
-      width: 100%; 
-      overflow-x: auto; 
-      max-height: 60vh; 
-      margin-top: 10px; 
-    }
-    table { 
-      width: 100%; 
-      border-collapse: collapse; 
-      text-align: left; 
-      min-width: 600px; 
-    }
-    thead th { 
-      background: rgba(0, 0, 0, 0.3); 
-      color: var(--accent-yellow); 
-      padding: 15px; 
-      position: sticky; 
-      top: 0; 
-      font-weight: 600; 
-    }
-    tbody td { 
-      padding: 12px 15px; 
-      border-bottom: 1px solid rgba(255, 255, 255, 0.05); 
-      color: #cbd5e1; 
-    }
-    tbody tr:hover { 
-      background: rgba(255, 255, 255, 0.05); 
-    }
-
-    /* LOADING & STATUS */
-    .loading-text { 
-      text-align: center; 
-      padding: 30px; 
-      font-size: 18px; 
-      color: var(--accent-yellow); 
-      display: none; 
-    }
-    #dataCount {
-      margin-left: auto; 
-      font-size: 14px; 
-      color: var(--accent-yellow);
-      font-weight: 600;
-    }
+    .table-wrapper { width: 100%; overflow-x: auto; max-height: 60vh; margin-top: 10px; }
+    table { width: 100%; border-collapse: collapse; text-align: left; min-width: 1000px; }
+    thead th { background: rgba(0, 0, 0, 0.3); color: var(--accent-yellow); padding: 12px; position: sticky; top: 0; font-size: 14px; white-space: nowrap;}
+    tbody td { padding: 10px 12px; border-bottom: 1px solid rgba(255, 255, 255, 0.05); color: #cbd5e1; font-size: 13px; }
+    #loading { text-align: center; padding: 30px; font-size: 18px; color: var(--accent-yellow); display: none; }
   </style>
 </head>
 <body>
 
   <header>
-    <div class="title-wrapper">
-      <h1><i class="fa-solid fa-file-excel"></i> Database Riwayat & Export</h1>
-    </div>
-    <a href="index.html" class="nav-btn"><i class="fa-solid fa-chart-pie"></i> Kembali ke Dashboard</a>
+    <div class="title-wrapper"><h1 style="color:var(--accent-yellow)"><i class="fa-solid fa-database"></i> Database Harian & Riwayat Alat</h1></div>
+    <a href="index.html" class="nav-btn"><i class="fa-solid fa-chart-pie"></i> Dashboard Utama</a>
   </header>
 
   <div class="glass-card">
-    
     <div class="filter-section">
       <div style="display: flex; align-items: center; gap: 10px;">
-        <label><i class="fa-solid fa-calendar-days"></i> Pilih Tanggal:</label>
+        <label>Pilih Tanggal:</label>
         <input type="date" id="filterDate" onchange="applyFilter()">
       </div>
-      
-      <button class="btn-action" onclick="refreshData()">
-        <i class="fa-solid fa-sync"></i> Refresh
-      </button>
-      
-      <button class="btn-action download" onclick="exportToExcel()">
-        <i class="fa-solid fa-download"></i> Download Excel
-      </button>
-      
-      <div id="dataCount">Memuat data...</div>
+      <button class="btn-action" onclick="refreshData()"><i class="fa-solid fa-sync"></i> Refresh Data</button>
+      <button class="btn-action download" onclick="exportToExcel()"><i class="fa-solid fa-download"></i> Download Excel</button>
+      <div id="dataCount" style="margin-left:auto; font-weight:600; color:var(--accent-yellow);">Memuat data...</div>
     </div>
 
-    <div class="loading-text" id="loading">
-      <i class="fa-solid fa-spinner fa-spin"></i> Mengambil data dari Firebase...
-    </div>
+    <div id="loading"><i class="fa-solid fa-spinner fa-spin"></i> Menarik data dari server...</div>
 
     <div class="table-wrapper">
       <table id="dataTable">
         <thead>
           <tr>
             <th>Waktu (WIB)</th>
-            <th>Tinggi Sawah (cm)</th>
-            <th>Tinggi Tambak (cm)</th>
-            <th>Kelembapan Tanah (%)</th>
-            <th>Tegangan Baterai (V)</th>
+            <th>Sawah (cm)</th>
+            <th>Tambak (cm)</th>
+            <th>Tanah (%)</th>
+            <th>Baterai (V)</th>
+            <th>Durasi Pompa 1</th>
+            <th>Durasi Pompa 2</th>
+            <th>Waktu Akt Buka</th>
+            <th>Jml Buka</th>
+            <th>Jml Tutup</th>
           </tr>
         </thead>
-        <tbody id="tableBody">
-          </tbody>
+        <tbody id="tableBody"></tbody>
       </table>
     </div>
   </div>
 
   <script>
     const firebaseUrl = "https://my-monitoringsawaharnf-default-rtdb.asia-southeast1.firebasedatabase.app/riwayat_data.json?auth=qvhTBUaXXmJpfFKgd8HMrgwIEwR5uK43QMC3k7FU";
-    let masterData = []; // Menyimpan semua data asli dari Firebase
+    let masterData = [];
+
+    // Format Detik ke Jam:Menit:Detik
+    function formatWaktu(detik) {
+      if(detik === undefined || detik === null) return "00:00:00";
+      const j = Math.floor(detik / 3600), m = Math.floor((detik % 3600) / 60), d = detik % 60;
+      return [j,m,d].map(v => v < 10 ? "0"+v : v).join(":");
+    }
 
     async function refreshData() {
-      const tbody = document.getElementById('tableBody');
-      const loading = document.getElementById('loading');
-      const countEl = document.getElementById('dataCount');
+      document.getElementById('loading').style.display = "block";
+      document.getElementById('tableBody').innerHTML = "";
       
-      tbody.innerHTML = ""; 
-      loading.style.display = "block";
-      countEl.innerText = "Mengambil data...";
-
       try {
         const response = await fetch(firebaseUrl);
         const data = await response.json();
-        loading.style.display = "none";
+        document.getElementById('loading').style.display = "none";
 
         if (data) {
-          // Ubah object Firebase menjadi array dan urutkan dari yang terbaru (reverse)
           masterData = Object.values(data).reverse();
-          applyFilter(); // Terapkan filter (jika ada) dan render tabel
-        } else {
-          tbody.innerHTML = "<tr><td colspan='5' style='text-align:center;'>Belum ada data di Firebase.</td></tr>";
-          countEl.innerText = "Total: 0 Baris";
+          applyFilter();
         }
-      } catch (error) {
-        loading.style.display = "none";
-        console.error("Gagal mengambil data:", error);
-        tbody.innerHTML = "<tr><td colspan='5' style='text-align:center; color:#ef4444;'>Gagal mengambil data. Periksa koneksi internet.</td></tr>";
-        countEl.innerText = "Error";
+      } catch (e) {
+        document.getElementById('loading').style.display = "none";
+        document.getElementById('dataCount').innerText = "Gagal mengambil data.";
       }
     }
 
     function renderTable(dataArray) {
       const tbody = document.getElementById('tableBody');
-      const countEl = document.getElementById('dataCount');
       tbody.innerHTML = "";
-
-      if(dataArray.length === 0) {
-        tbody.innerHTML = "<tr><td colspan='5' style='text-align:center;'>Tidak ada data pada tanggal tersebut.</td></tr>";
-      } else {
-        dataArray.forEach(row => {
-          let tr = document.createElement("tr");
-          tr.innerHTML = `
-            <td style="font-weight:600; color:white;">${row.waktu || "-"}</td>
-            <td>${row.sawah !== undefined ? row.sawah.toFixed(1) : "0"}</td>
-            <td>${row.tambak !== undefined ? row.tambak.toFixed(1) : "0"}</td>
-            <td>${row.soil !== undefined ? row.soil : "0"}</td>
-            <td>${row.voltage !== undefined ? row.voltage.toFixed(1) : "0"}</td>
-          `;
-          tbody.appendChild(tr);
-        });
-      }
       
-      countEl.innerText = "Total: " + dataArray.length + " Baris";
+      dataArray.forEach(row => {
+        let tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td style="font-weight:600; color:white;">${row.waktu || "-"}</td>
+          <td>${row.sawah !== undefined ? row.sawah.toFixed(1) : "0"}</td>
+          <td>${row.tambak !== undefined ? row.tambak.toFixed(1) : "0"}</td>
+          <td>${row.soil !== undefined ? row.soil : "0"}</td>
+          <td>${row.voltage !== undefined ? row.voltage.toFixed(1) : "0"}</td>
+          <td style="color:#3b82f6">${formatWaktu(row.durP1)}</td>
+          <td style="color:#3b82f6">${formatWaktu(row.durP2)}</td>
+          <td style="color:#10b981">${formatWaktu(row.durAktBuka)}</td>
+          <td style="color:#fbbf24">${row.cntBuka || 0} Kali</td>
+          <td style="color:#ef4444">${row.cntTutup || 0} Kali</td>
+        `;
+        tbody.appendChild(tr);
+      });
+      document.getElementById('dataCount').innerText = "Total: " + dataArray.length + " Baris";
     }
 
     function applyFilter() {
-      const selectedDate = document.getElementById('filterDate').value; // Format: YYYY-MM-DD
-      
-      if (!selectedDate) {
-        renderTable(masterData);
-        return;
-      }
-
-      // Filter berdasarkan string tanggal yang ada di row.waktu
-      const filtered = masterData.filter(row => {
-        if (!row.waktu) return false;
-        return row.waktu.includes(selectedDate);
-      });
-
+      const selectedDate = document.getElementById('filterDate').value;
+      const filtered = selectedDate ? masterData.filter(r => r.waktu && r.waktu.includes(selectedDate)) : masterData;
       renderTable(filtered);
     }
 
     function exportToExcel() {
       const selectedDate = document.getElementById('filterDate').value;
-      const dataToExport = selectedDate ? masterData.filter(row => row.waktu && row.waktu.includes(selectedDate)) : masterData;
-
-      if (dataToExport.length === 0) { 
-        alert("Tidak ada data untuk di-download pada tanggal ini!"); 
-        return; 
-      }
+      const dataToExport = selectedDate ? masterData.filter(r => r.waktu && r.waktu.includes(selectedDate)) : masterData;
+      if (dataToExport.length === 0) return alert("Tidak ada data untuk di-download!"); 
       
-      // Header File CSV
-      let csvContent = "Waktu,Sawah(cm),Tambak(cm),Tanah(%),Baterai(V)\n";
+      let csvContent = "Waktu,Sawah(cm),Tambak(cm),Tanah(%),Baterai(V),Durasi P1,Durasi P2,Waktu Aktuator Terbuka,Jumlah Buka,Jumlah Tutup\n";
       
-      // Isi Data CSV
-      dataToExport.forEach(row => {
-        let sawah = row.sawah !== undefined ? row.sawah : "0";
-        let tambak = row.tambak !== undefined ? row.tambak : "0";
-        let soil = row.soil !== undefined ? row.soil : "0";
-        let voltage = row.voltage !== undefined ? row.voltage : "0";
-        let waktu = row.waktu || "";
+      dataToExport.forEach(r => {
+        let sawah = r.sawah !== undefined ? r.sawah : "0";
+        let tambak = r.tambak !== undefined ? r.tambak : "0";
+        let soil = r.soil !== undefined ? r.soil : "0";
+        let voltage = r.voltage !== undefined ? r.voltage : "0";
+        let waktu = r.waktu || "";
         
-        csvContent += `${waktu},${sawah},${tambak},${soil},${voltage}\n`;
+        csvContent += `${waktu},${sawah},${tambak},${soil},${voltage},${formatWaktu(r.durP1)},${formatWaktu(r.durP2)},${formatWaktu(r.durAktBuka)},${r.cntBuka || 0},${r.cntTutup || 0}\n`;
       });
       
-      // Proses Download File CSV
       const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-      const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
-      link.setAttribute("href", url);
-      link.setAttribute("download", `Data_Sawah_${selectedDate || 'Semua'}.csv`);
-      link.style.visibility = 'hidden';
-      
+      link.href = URL.createObjectURL(blob);
+      link.download = `Laporan_Data_Sawah_${selectedDate || 'Semua'}.csv`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
     }
 
-    // Panggil fungsi pengambilan data saat halaman pertama kali dimuat
     window.onload = refreshData;
   </script>
 </body>
