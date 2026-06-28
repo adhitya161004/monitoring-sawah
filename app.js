@@ -153,6 +153,41 @@ let statusTerakhir = {
   soilKondisi: null     // "kering" | "cukup"
 };
 
+// --- IZIN NOTIFIKASI BROWSER (Muncul di status bar HP) ---
+function updateBadgeNotifikasi() {
+  const btn = document.getElementById("btn-notif-permission");
+  if (!btn || !("Notification" in window)) return;
+  if (Notification.permission === "granted" || Notification.permission === "denied") {
+    btn.style.display = "none";
+  } else {
+    btn.style.display = "flex";
+  }
+}
+
+window.mintaIzinNotifikasi = function() {
+  if (!("Notification" in window)) {
+    alert("Browser ini tidak mendukung notifikasi.");
+    return;
+  }
+  Notification.requestPermission().then(() => updateBadgeNotifikasi());
+};
+
+document.addEventListener("DOMContentLoaded", updateBadgeNotifikasi);
+
+function showNativeNotification(title, body, tag) {
+  if (!("Notification" in window)) return;
+  if (Notification.permission === "granted") {
+    try {
+      new Notification(title, { 
+        body: body, 
+        tag: tag,           // mencegah notifikasi duplikat menumpuk untuk kondisi yang sama
+        renotify: true,
+        icon: "https://cdn-icons-png.flaticon.com/512/2911/2911771.png" // ikon padi sederhana
+      });
+    } catch (e) { console.error("Gagal munculkan notifikasi native:", e); }
+  }
+}
+
 function showToast(title, message, type = "warning", icon = "fa-triangle-exclamation") {
   const container = document.getElementById("notif-container");
   if (!container) return;
@@ -170,6 +205,9 @@ function showToast(title, message, type = "warning", icon = "fa-triangle-exclama
     toast.style.animation = "fadeOut 0.4s ease-in forwards";
     setTimeout(() => toast.remove(), 400);
   }, 6000);
+
+  // Munculkan juga sebagai notifikasi native di status bar HP
+  showNativeNotification(title, message, "sawah-" + type);
 }
 
 function cekNotifikasiThreshold(d) {
