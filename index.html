@@ -76,9 +76,32 @@
     .chart-box { height: 250px; cursor: ew-resize; }
     .section-title { font-size: 16px; font-weight: 600; color: var(--accent-yellow); margin-bottom: 15px; display: flex; align-items: center; gap: 10px; }
     .device-val { font-family: monospace; font-size: 14px; color: var(--accent-yellow); background: rgba(0,0,0,0.3); padding: 4px 10px; border-radius: 6px; }
+
+    /* NOTIFIKASI TOAST */
+    #notif-container { position: fixed; top: 20px; right: 20px; z-index: 999; display: flex; flex-direction: column; gap: 10px; max-width: 350px; }
+    .toast {
+      background: rgba(17, 34, 64, 0.95); backdrop-filter: blur(10px); border: 1px solid var(--glass-border);
+      border-left: 4px solid var(--accent-blue); border-radius: 10px; padding: 14px 16px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.4); animation: slideIn 0.3s ease-out;
+      display: flex; align-items: flex-start; gap: 10px; font-size: 13px;
+    }
+    .toast.success { border-left-color: var(--status-on); }
+    .toast.warning { border-left-color: var(--accent-yellow); }
+    .toast.danger { border-left-color: var(--status-off); }
+    .toast i { font-size: 18px; margin-top: 2px; }
+    .toast.success i { color: var(--status-on); }
+    .toast.warning i { color: var(--accent-yellow); }
+    .toast.danger i { color: var(--status-off); }
+    .toast .toast-text strong { display: block; margin-bottom: 2px; color: white; }
+    @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+    @keyframes fadeOut { from { opacity: 1; } to { opacity: 0; } }
+    @media (max-width: 500px) { #notif-container { left: 10px; right: 10px; max-width: none; } }
   </style>
 </head>
 <body>
+
+  <!-- NOTIFIKASI THRESHOLD -->
+  <div id="notif-container"></div>
 
   <!-- HEADER -->
   <header>
@@ -106,7 +129,7 @@
       <div class="sensor-value" id="sawah">-- cm</div>
     </div>
     <div class="glass-card sensor-card">
-      <div class="sensor-title">Tinggi Tambak</div>
+      <div class="sensor-title">Tinggi Tandon</div>
       <div class="sensor-icon"><i class="fa-solid fa-water"></i></div>
       <div class="sensor-value" id="tambak">-- cm</div>
     </div>
