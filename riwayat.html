@@ -52,7 +52,7 @@
             <th>Waktu (WIB)</th>
             <th>Set Ketinggian (cm)</th>
             <th>Sawah (cm)</th>
-            <th>Tambak (cm)</th>
+            <th>Tandon (cm)</th>
             <th>Tanah (%)</th>
             <th>Baterai (V)</th>
             <th>Durasi Pompa 1</th>
@@ -132,7 +132,7 @@
       const dataToExport = selectedDate ? masterData.filter(r => r.waktu && r.waktu.includes(selectedDate)) : masterData;
       if (dataToExport.length === 0) return alert("Tidak ada data untuk di-download!"); 
       
-      let csvContent = "Waktu,Set Ketinggian(cm),Sawah(cm),Tambak(cm),Tanah(%),Baterai(V),Durasi P1,Durasi P2,Waktu Slr Terbuka,Jumlah Buka,Jumlah Tutup\n";
+      let csvContent = "Waktu,Set Ketinggian(cm),Sawah(cm),Tandon(cm),Tanah(%),Baterai(V),Durasi P1,Durasi P2,Waktu Slr Terbuka,Jumlah Buka,Jumlah Tutup\n";
       
       dataToExport.forEach(r => {
         let setting = r.setting !== undefined ? r.setting : "0";
