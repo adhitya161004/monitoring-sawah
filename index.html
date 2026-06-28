@@ -103,6 +103,23 @@
   <!-- NOTIFIKASI THRESHOLD -->
   <div id="notif-container"></div>
 
+  <!-- TOMBOL TES NOTIFIKASI (Hanya untuk debugging, aman dihapus nanti) -->
+  <div style="position: fixed; bottom: 15px; right: 15px; z-index: 998;">
+    <button onclick="document.getElementById('test-panel').style.display = document.getElementById('test-panel').style.display === 'none' ? 'flex' : 'none';" 
+      style="background: rgba(255,255,255,0.1); border-radius: 50%; width: 45px; height: 45px; font-size: 16px;">
+      <i class="fa-solid fa-vial"></i>
+    </button>
+    <div id="test-panel" style="display:none; flex-direction: column; gap: 8px; position: absolute; bottom: 55px; right: 0; background: rgba(17,34,64,0.95); backdrop-filter: blur(10px); border: 1px solid var(--glass-border); border-radius: 12px; padding: 12px; width: 220px;">
+      <strong style="font-size: 12px; color: var(--text-muted);">TES NOTIFIKASI</strong>
+      <button onclick="cekNotifikasiThreshold({sawah: 14, tambak: 60, soil: 70})" style="font-size:12px; text-align:left;">✅ Kondisi Normal</button>
+      <button onclick="cekNotifikasiThreshold({sawah: 5, tambak: 60, soil: 70})" style="font-size:12px; text-align:left;">⚠️ Sawah Kurang Air</button>
+      <button onclick="cekNotifikasiThreshold({sawah: 25, tambak: 60, soil: 70})" style="font-size:12px; text-align:left;">⚠️ Sawah Kelebihan Air</button>
+      <button onclick="cekNotifikasiThreshold({sawah: 14, tambak: 15, soil: 70})" style="font-size:12px; text-align:left;">🚨 Tandon Rendah</button>
+      <button onclick="cekNotifikasiThreshold({sawah: 14, tambak: 126, soil: 70})" style="font-size:12px; text-align:left;">⚠️ Tandon Penuh</button>
+      <button onclick="cekNotifikasiThreshold({sawah: 14, tambak: 60, soil: 95})" style="font-size:12px; text-align:left;">⚠️ Tanah Kering</button>
+    </div>
+  </div>
+
   <!-- HEADER -->
   <header>
     <div class="title-wrapper">
