@@ -24,6 +24,7 @@ document.addEventListener("DOMContentLoaded", () => {
     document.getElementById("settingSlider").value = localTarget; // Menggeser bulatan slider
     document.getElementById("sliderValue").innerText = localTarget; // Mengubah angka besar
     document.getElementById("target-status").innerText = localTarget; // Mengubah angka kecil
+    targetSawahAktif = parseFloat(localTarget);
   }
 });
 
@@ -76,7 +77,7 @@ const soilChart = new Chart(ctxSoil, { type: "line", data: { labels: [], dataset
 const ctxSawah = document.getElementById("sawahChart").getContext("2d");
 const sawahChart = new Chart(ctxSawah, { type: "line", data: { labels: [], datasets: [{ label: "Tinggi Sawah (cm)", data: [], borderColor: "#3b82f6", backgroundColor: "rgba(59, 130, 246, 0.1)", borderWidth: 2, fill: true, tension: 0.4 }] }, options: getChartOptions() });
 const ctxTambak = document.getElementById("tambakChart").getContext("2d");
-const tambakChart = new Chart(ctxTambak, { type: "line", data: { labels: [], datasets: [{ label: "Tinggi Tambak (cm)", data: [], borderColor: "#fbbf24", backgroundColor: "rgba(251, 191, 36, 0.1)", borderWidth: 2, fill: true, tension: 0.4 }] }, options: getChartOptions() });
+const tambakChart = new Chart(ctxTambak, { type: "line", data: { labels: [], datasets: [{ label: "Tinggi Tandon (cm)", data: [], borderColor: "#fbbf24", backgroundColor: "rgba(251, 191, 36, 0.1)", borderWidth: 2, fill: true, tension: 0.4 }] }, options: getChartOptions() });
 
 function updateChartData(chart, newData, timeStr) {
   chart.data.labels.push(timeStr);
@@ -99,6 +100,7 @@ async function ambilDataAwalDariFirebase() {
     if (configData) {
       if (configData.mode) updateButtonUI('mode', configData.mode === "AUTO" ? 'btn-auto' : 'btn-manual');
       if (configData.target) {
+        targetSawahAktif = parseFloat(configData.target);
         document.getElementById("target-status").innerText = configData.target;
         document.getElementById("settingSlider").value = configData.target; // Sinkronisasi posisi slider dari server
         document.getElementById("sliderValue").innerText = configData.target;
@@ -137,6 +139,92 @@ async function ambilDataAwalDariFirebase() {
 }
 
 // ==========================================
+// 4B. SISTEM NOTIFIKASI THRESHOLD
+// ==========================================
+// Nilai ini sengaja disamakan dengan threshold safety di kode ESP32 (MIN_AIR_TAMBAK, MAX_AIR_TAMBAK, MIN_AIR_SAWAH)
+const MIN_AIR_TAMBAK = 20.0;
+const MAX_AIR_TAMBAK = 125.0;
+const MIN_AIR_SAWAH  = 2.0;
+let targetSawahAktif = 14.0; // otomatis disinkronkan dari slider/konfigurasi Firebase/MQTT
+
+let statusTerakhir = {
+  sawahKondisi: null,   // "sesuai" | "kurang" | "lebih"
+  tambakKondisi: null,  // "rendah" | "penuh" | "normal"
+  soilKondisi: null     // "kering" | "cukup"
+};
+
+function showToast(title, message, type = "warning", icon = "fa-triangle-exclamation") {
+  const container = document.getElementById("notif-container");
+  if (!container) return;
+
+  const toast = document.createElement("div");
+  toast.className = `toast ${type}`;
+  toast.innerHTML = `
+    <i class="fa-solid ${icon}"></i>
+    <div class="toast-text"><strong>${title}</strong>${message}</div>
+  `;
+  container.appendChild(toast);
+
+  // Auto hilang setelah 6 detik
+  setTimeout(() => {
+    toast.style.animation = "fadeOut 0.4s ease-in forwards";
+    setTimeout(() => toast.remove(), 400);
+  }, 6000);
+}
+
+function cekNotifikasiThreshold(d) {
+  if (d.sawah === undefined || d.tambak === undefined || d.soil === undefined) return;
+
+  const ambangBawah = Math.max(0, targetSawahAktif - 3.0);
+  const ambangAtas = targetSawahAktif + 3.0;
+
+  // --- CEK KETINGGIAN SAWAH vs TARGET ---
+  let sawahKondisi;
+  if (d.sawah < ambangBawah) sawahKondisi = "kurang";
+  else if (d.sawah > ambangAtas) sawahKondisi = "lebih";
+  else sawahKondisi = "sesuai";
+
+  if (sawahKondisi !== statusTerakhir.sawahKondisi) {
+    if (sawahKondisi === "sesuai") {
+      showToast("Ketinggian Sawah Sesuai", `Air sawah ${d.sawah.toFixed(1)} cm sudah sesuai target (${targetSawahAktif} cm).`, "success", "fa-circle-check");
+    } else if (sawahKondisi === "kurang") {
+      showToast("Air Sawah Kurang", `Tinggi air ${d.sawah.toFixed(1)} cm di bawah ambang (${ambangBawah.toFixed(1)} cm). Pompa 1 akan aktif.`, "warning", "fa-droplet-slash");
+    } else if (sawahKondisi === "lebih") {
+      showToast("Air Sawah Berlebih", `Tinggi air ${d.sawah.toFixed(1)} cm melebihi ambang (${ambangAtas.toFixed(1)} cm). Air dialirkan ke tandon.`, "warning", "fa-water");
+    }
+    statusTerakhir.sawahKondisi = sawahKondisi;
+  }
+
+  // --- CEK KETINGGIAN TAMBAK ---
+  let tambakKondisi;
+  if (d.tambak <= MIN_AIR_TAMBAK) tambakKondisi = "rendah";
+  else if (d.tambak >= MAX_AIR_TAMBAK) tambakKondisi = "penuh";
+  else tambakKondisi = "normal";
+
+  if (tambakKondisi !== statusTerakhir.tambakKondisi) {
+    if (tambakKondisi === "rendah") {
+      showToast("Air Tandon Rendah", `Ketinggian tandon ${d.tambak.toFixed(1)} cm di bawah batas minimum (${MIN_AIR_TAMBAK} cm). Pompa 1 dinonaktifkan (safety interlock).`, "danger", "fa-circle-exclamation");
+    } else if (tambakKondisi === "penuh") {
+      showToast("Tandon Penuh", `Ketinggian tandon ${d.tambak.toFixed(1)} cm mencapai batas maksimum (${MAX_AIR_TAMBAK} cm). Saluran pembuangan dibuka.`, "warning", "fa-door-open");
+    } else if (statusTerakhir.tambakKondisi !== null) {
+      showToast("Tandon Normal", `Ketinggian tandon ${d.tambak.toFixed(1)} cm kembali pada kondisi normal.`, "success", "fa-circle-check");
+    }
+    statusTerakhir.tambakKondisi = tambakKondisi;
+  }
+
+  // --- CEK KELEMBABAN TANAH ---
+  let soilKondisi = d.soil < 80 ? "kering" : "cukup";
+  if (soilKondisi !== statusTerakhir.soilKondisi) {
+    if (soilKondisi === "kering") {
+      showToast("Tanah Belum Lembab", `Kelembaban tanah ${d.soil}% di bawah ambang 80%. Pompa irigasi aktif.`, "warning", "fa-seedling");
+    } else {
+      showToast("Kelembaban Tanah Cukup", `Kelembaban tanah ${d.soil}% sudah memenuhi ambang kebutuhan.`, "success", "fa-circle-check");
+    }
+    statusTerakhir.soilKondisi = soilKondisi;
+  }
+}
+
+// ==========================================
 // 5. KONEKSI & PENANGANAN PESAN MQTT
 // ==========================================
 client.on("connect", () => {
@@ -158,6 +246,7 @@ client.on("message", (topic, message) => {
   if (topic === "sistem/mode") updateButtonUI('mode', msg === "AUTO" ? 'btn-auto' : 'btn-manual');
   
   if (topic === "sistem/setting_tinggi") {
+    targetSawahAktif = parseFloat(msg);
     document.getElementById("target-status").innerText = msg;
     document.getElementById("settingSlider").value = msg; // Sinkronisasi posisi slider via MQTT
     document.getElementById("sliderValue").innerText = msg;
@@ -167,6 +256,7 @@ client.on("message", (topic, message) => {
   if (topic === "sawah/data") {
     try {
       let d = JSON.parse(msg);
+      cekNotifikasiThreshold(d);
       const timeNow = new Date().toLocaleTimeString('id-ID', { hour: "2-digit", minute: "2-digit", second: "2-digit" });
 
       if (d.soil !== undefined) document.getElementById("soil").innerText = d.soil + " %";
@@ -197,6 +287,7 @@ window.sendManual = (d, s) => client.publish("manual/" + d, s);
 
 window.setSetting = () => {
   const sliderValue = document.getElementById("settingSlider").value;
+  targetSawahAktif = parseFloat(sliderValue);
   client.publish("sistem/setting_tinggi", sliderValue);
   
   // Tampilkan Instan di Layar
