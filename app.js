@@ -271,7 +271,6 @@ client.on("connect", () => {
   client.subscribe("sawah/data"); 
   client.subscribe("sistem/mode"); 
   client.subscribe("sistem/setting_tinggi");
-  client.subscribe("sawah/tes_notifikasi"); // topic khusus simulasi notifikasi (broadcast semua user)
 });
  
 client.on("error", () => {
@@ -316,14 +315,6 @@ client.on("message", (topic, message) => {
       if (d.tambak !== undefined) updateChartData(tambakChart, d.tambak, timeNow);
     } catch (e) {}
   }
- 
-  // Pesan simulasi/tes notifikasi dari user manapun -> semua user yang online akan ikut menerima
-  if (topic === "sawah/tes_notifikasi") {
-    try {
-      let d = JSON.parse(msg);
-      cekNotifikasiThreshold(d);
-    } catch (e) {}
-  }
 });
  
 // ==========================================
@@ -343,43 +334,6 @@ window.setSetting = () => {
   
   // Simpan secara permanen ke memori lokal
   localStorage.setItem("targetSawahTerakhir", sliderValue);
-};
- 
-// ==========================================
-// 7. FUNGSI TES / SIMULASI NOTIFIKASI
-// ==========================================
-// Dikirim lewat MQTT topic terpisah (sawah/tes_notifikasi) supaya:
-// 1) Semua user yang online ikut menerima notifikasi simulasi (bukan cuma yang menekan tombol)
-// 2) Tidak mengubah data sensor asli / grafik / status pompa-aktuator di layar
-// 3) Nilai simulasi otomatis mengikuti target ketinggian sawah yang sedang aktif saat itu
-window.kirimTesNotifikasi = function(jenis) {
-  const target = targetSawahAktif || 14;
-  let data;
- 
-  switch (jenis) {
-    case "normal":
-      data = { sawah: target, tambak: 60, soil: 70 };
-      break;
-    case "kurang":
-      data = { sawah: Math.max(0, target - 5), tambak: 60, soil: 70 };
-      break;
-    case "lebih":
-      data = { sawah: target + 5, tambak: 60, soil: 70 };
-      break;
-    case "tandon_rendah":
-      data = { sawah: target, tambak: MIN_AIR_TAMBAK - 5, soil: 70 };
-      break;
-    case "tandon_penuh":
-      data = { sawah: target, tambak: MAX_AIR_TAMBAK + 5, soil: 70 };
-      break;
-    case "tanah_kering":
-      data = { sawah: target, tambak: 60, soil: 50 }; // <80 = kering sesuai logika cekNotifikasiThreshold
-      break;
-    default:
-      return;
-  }
- 
-  client.publish("sawah/tes_notifikasi", JSON.stringify(data));
 };
  
 ambilDataAwalDariFirebase();
