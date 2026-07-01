@@ -1,339 +1,248 @@
-// ==========================================
-// 1. KONFIGURASI MQTT & FIREBASE
-// ==========================================
-const options = { 
-  username: "monitoringsawahbyarnf", 
-  password: "Gakkenek1", 
-  protocol: "wss" 
-};
-
-const client = mqtt.connect("wss://3bf57b9ff69e4d24ac2161a9955cac2d.s1.eu.hivemq.cloud:8884/mqtt", options);
-const firebaseREST = 'https://my-monitoringsawaharnf-default-rtdb.asia-southeast1.firebasedatabase.app/riwayat_data.json?auth=qvhTBUaXXmJpfFKgd8HMrgwIEwR5uK43QMC3k7FU&orderBy="$key"&limitToLast=2000';
-const configURL = 'https://my-monitoringsawaharnf-default-rtdb.asia-southeast1.firebasedatabase.app/konfigurasi.json?auth=qvhTBUaXXmJpfFKgd8HMrgwIEwR5uK43QMC3k7FU';
-
-const MAX_DATA_MEMORY = 2000; 
-const TAMPILAN_DILAYAR = 30;  
-
-// ==========================================
-// FITUR INSTAN MEMORI BROWSER (LOCAL STORAGE)
-// ==========================================
-// Memastikan posisi Slider dan Angka langsung sinkron saat web dibuka
-document.addEventListener("DOMContentLoaded", () => {
-  let localTarget = localStorage.getItem("targetSawahTerakhir");
-  if(localTarget) {
-    document.getElementById("settingSlider").value = localTarget; // Menggeser bulatan slider
-    document.getElementById("sliderValue").innerText = localTarget; // Mengubah angka besar
-    document.getElementById("target-status").innerText = localTarget; // Mengubah angka kecil
-    targetSawahAktif = parseFloat(localTarget);
-  }
-});
-
-// ==========================================
-// 2. FUNGSI PENDUKUNG UI & FORMATTING
-// ==========================================
-function formatKeWaktu(totalDetik) {
-  if (totalDetik === undefined || totalDetik === null) return "00:00:00";
-  const jam = Math.floor(totalDetik / 3600);
-  const menit = Math.floor((totalDetik % 3600) / 60);
-  const detik = totalDetik % 60;
-  return [jam, menit, detik].map(v => v < 10 ? "0" + v : v).join(":");
-}
-
-function updateButtonUI(groupId, activeBtnId) {
-  const config = {
-    'mode': { on: 'btn-auto', off: 'btn-manual' },
-    'p1': { on: 'btn-p1-on', off: 'btn-p1-off' },
-    'p2': { on: 'btn-p2-on', off: 'btn-p2-off' },
-    'akt': { on: 'btn-akt-buka', off: 'btn-akt-tutup' }
-  };
-  const cfg = config[groupId];
-  if(!cfg) return;
-  const elOn = document.getElementById(cfg.on);
-  const elOff = document.getElementById(cfg.off);
-  if(elOn && elOff) {
-    if(activeBtnId === cfg.on) { elOn.className = 'active-on'; elOff.className = ''; } 
-    else if (activeBtnId === cfg.off) { elOn.className = ''; elOff.className = 'active-off'; }
-  }
-}
-
-window.updateSliderValue = function(val) {
-  const sliderVal = document.getElementById("sliderValue");
-  if(sliderVal) sliderVal.innerText = val;
-};
-
-// ==========================================
-// 3. INISIALISASI GRAFIK (CHART.JS)
-// ==========================================
-function getChartOptions() {
-  return { 
-    responsive: true, maintainAspectRatio: false, animation: { duration: 0 }, 
-    plugins: { legend: { labels: { color: "#e2e8f0", font: { family: "'Poppins', sans-serif" } } }, zoom: { pan: { enabled: true, mode: 'x' }, zoom: { wheel: { enabled: true }, pinch: { enabled: true }, mode: 'x' } } }, 
-    scales: { y: { grid: { color: "rgba(255,255,255,0.05)" }, ticks: { color: "#94a3b8" } }, x: { grid: { display: false }, ticks: { color: "#94a3b8", maxRotation: 45, minRotation: 45 }, min: 0, max: TAMPILAN_DILAYAR } } 
-  };
-}
-
-const ctxSoil = document.getElementById("soilChart").getContext("2d");
-const soilChart = new Chart(ctxSoil, { type: "line", data: { labels: [], datasets: [{ label: "Kelembapan Tanah (%)", data: [], borderColor: "#10b981", backgroundColor: "rgba(16, 185, 129, 0.1)", borderWidth: 2, fill: true, tension: 0.4 }] }, options: getChartOptions() });
-const ctxSawah = document.getElementById("sawahChart").getContext("2d");
-const sawahChart = new Chart(ctxSawah, { type: "line", data: { labels: [], datasets: [{ label: "Tinggi Sawah (cm)", data: [], borderColor: "#3b82f6", backgroundColor: "rgba(59, 130, 246, 0.1)", borderWidth: 2, fill: true, tension: 0.4 }] }, options: getChartOptions() });
-const ctxTambak = document.getElementById("tambakChart").getContext("2d");
-const tambakChart = new Chart(ctxTambak, { type: "line", data: { labels: [], datasets: [{ label: "Tinggi Tandon (cm)", data: [], borderColor: "#fbbf24", backgroundColor: "rgba(251, 191, 36, 0.1)", borderWidth: 2, fill: true, tension: 0.4 }] }, options: getChartOptions() });
-
-function updateChartData(chart, newData, timeStr) {
-  chart.data.labels.push(timeStr);
-  chart.data.datasets[0].data.push(newData);
-  if (chart.data.labels.length > MAX_DATA_MEMORY) { chart.data.labels.shift(); chart.data.datasets[0].data.shift(); }
-  let total = chart.data.labels.length;
-  chart.options.scales.x.min = total > TAMPILAN_DILAYAR ? total - TAMPILAN_DILAYAR : 0;
-  chart.options.scales.x.max = total - 1;
-  chart.update();
-}
-
-// ==========================================
-// 4. LOAD PERSISTENCE DARI FIREBASE
-// ==========================================
-async function ambilDataAwalDariFirebase() {
-  try {
-    // A. Ambil Konfigurasi dari server
-    const resConfig = await fetch(configURL);
-    const configData = await resConfig.json();
-    if (configData) {
-      if (configData.mode) updateButtonUI('mode', configData.mode === "AUTO" ? 'btn-auto' : 'btn-manual');
-      if (configData.target) {
-        targetSawahAktif = parseFloat(configData.target);
-        document.getElementById("target-status").innerText = configData.target;
-        document.getElementById("settingSlider").value = configData.target; // Sinkronisasi posisi slider dari server
-        document.getElementById("sliderValue").innerText = configData.target;
-        localStorage.setItem("targetSawahTerakhir", configData.target);
-      }
-    }
-
-    // B. Ambil Riwayat Data
-    const response = await fetch(firebaseREST);
-    const data = await response.json();
-    if (data) {
-      const records = Object.values(data);
-      records.forEach(row => {
-        let timeOnly = row.waktu ? row.waktu.split(" ")[1] : "";
-        if (row.soil !== undefined) { soilChart.data.labels.push(timeOnly); soilChart.data.datasets[0].data.push(row.soil); }
-        if (row.sawah !== undefined) { sawahChart.data.labels.push(timeOnly); sawahChart.data.datasets[0].data.push(row.sawah); }
-        if (row.tambak !== undefined) { tambakChart.data.labels.push(timeOnly); tambakChart.data.datasets[0].data.push(row.tambak); }
-      });
-      [soilChart, sawahChart, tambakChart].forEach(ch => ch.update());
-
-      const last = records[records.length - 1];
-      if (last) {
-        document.getElementById("soil").innerText = (last.soil !== undefined ? last.soil : 0) + " %";
-        document.getElementById("sawah").innerText = (last.sawah !== undefined ? last.sawah.toFixed(1) : 0) + " cm";
-        document.getElementById("tambak").innerText = (last.tambak !== undefined ? last.tambak.toFixed(1) : 0) + " cm";
-        document.getElementById("battery").innerText = (last.voltage !== undefined ? last.voltage.toFixed(1) : 0) + " V";
-        
-        if (last.durP1 !== undefined) document.getElementById("durasi-p1").innerText = formatKeWaktu(last.durP1);
-        if (last.durP2 !== undefined) document.getElementById("durasi-p2").innerText = formatKeWaktu(last.durP2);
-        if (last.durAktBuka !== undefined) document.getElementById("durasi-akt").innerText = formatKeWaktu(last.durAktBuka);
-        if (last.cntBuka !== undefined) document.getElementById("cnt-buka").innerText = last.cntBuka + " Kali";
-        if (last.cntTutup !== undefined) document.getElementById("cnt-tutup").innerText = last.cntTutup + " Kali";
-      }
-    }
-  } catch(err) { console.error("Error Persistence:", err); }
-}
-
-// ==========================================
-// 4B. SISTEM NOTIFIKASI THRESHOLD
-// ==========================================
-// Nilai ini sengaja disamakan dengan threshold safety di kode ESP32 (MIN_AIR_TAMBAK, MAX_AIR_TAMBAK, MIN_AIR_SAWAH)
-const MIN_AIR_TAMBAK = 20.0;
-const MAX_AIR_TAMBAK = 125.0;
-const MIN_AIR_SAWAH  = 2.0;
-let targetSawahAktif = 14.0; // otomatis disinkronkan dari slider/konfigurasi Firebase/MQTT
-
-let statusTerakhir = {
-  sawahKondisi: null,   // "sesuai" | "kurang" | "lebih"
-  tambakKondisi: null,  // "rendah" | "penuh" | "normal"
-  soilKondisi: null     // "kering" | "cukup"
-};
-
-// --- IZIN NOTIFIKASI BROWSER (Muncul di status bar HP) ---
-function updateBadgeNotifikasi() {
-  const btn = document.getElementById("btn-notif-permission");
-  if (!btn || !("Notification" in window)) return;
-  if (Notification.permission === "granted" || Notification.permission === "denied") {
-    btn.style.display = "none";
-  } else {
-    btn.style.display = "flex";
-  }
-}
-
-window.mintaIzinNotifikasi = function() {
-  if (!("Notification" in window)) {
-    alert("Browser ini tidak mendukung notifikasi.");
-    return;
-  }
-  Notification.requestPermission().then(() => updateBadgeNotifikasi());
-};
-
-document.addEventListener("DOMContentLoaded", updateBadgeNotifikasi);
-
-function showNativeNotification(title, body, tag) {
-  if (!("Notification" in window)) return;
-  if (Notification.permission === "granted") {
-    try {
-      new Notification(title, { 
-        body: body, 
-        tag: tag,           // mencegah notifikasi duplikat menumpuk untuk kondisi yang sama
-        renotify: true,
-        icon: "https://cdn-icons-png.flaticon.com/512/2911/2911771.png" // ikon padi sederhana
-      });
-    } catch (e) { console.error("Gagal munculkan notifikasi native:", e); }
-  }
-}
-
-function showToast(title, message, type = "warning", icon = "fa-triangle-exclamation") {
-  const container = document.getElementById("notif-container");
-  if (!container) return;
-
-  const toast = document.createElement("div");
-  toast.className = `toast ${type}`;
-  toast.innerHTML = `
-    <i class="fa-solid ${icon}"></i>
-    <div class="toast-text"><strong>${title}</strong>${message}</div>
-  `;
-  container.appendChild(toast);
-
-  // Auto hilang setelah 6 detik
-  setTimeout(() => {
-    toast.style.animation = "fadeOut 0.4s ease-in forwards";
-    setTimeout(() => toast.remove(), 400);
-  }, 6000);
-
-  // Munculkan juga sebagai notifikasi native di status bar HP
-  showNativeNotification(title, message, "sawah-" + type);
-}
-
-function cekNotifikasiThreshold(d) {
-  if (d.sawah === undefined || d.tambak === undefined || d.soil === undefined) return;
-
-  const ambangBawah = Math.max(0, targetSawahAktif - 3.0);
-  const ambangAtas = targetSawahAktif + 3.0;
-
-  // --- CEK KETINGGIAN SAWAH vs TARGET ---
-  let sawahKondisi;
-  if (d.sawah < ambangBawah) sawahKondisi = "kurang";
-  else if (d.sawah > ambangAtas) sawahKondisi = "lebih";
-  else sawahKondisi = "sesuai";
-
-  if (sawahKondisi !== statusTerakhir.sawahKondisi) {
-    if (sawahKondisi === "sesuai") {
-      showToast("Ketinggian Sawah Sesuai", `Air sawah ${d.sawah.toFixed(1)} cm sudah sesuai target (${targetSawahAktif} cm).`, "success", "fa-circle-check");
-    } else if (sawahKondisi === "kurang") {
-      showToast("Air Sawah Kurang", `Tinggi air ${d.sawah.toFixed(1)} cm di bawah ambang (${ambangBawah.toFixed(1)} cm). Pompa 1 akan aktif.`, "warning", "fa-droplet-slash");
-    } else if (sawahKondisi === "lebih") {
-      showToast("Air Sawah Berlebih", `Tinggi air ${d.sawah.toFixed(1)} cm melebihi ambang (${ambangAtas.toFixed(1)} cm). Air dialirkan ke tandon.`, "warning", "fa-water");
-    }
-    statusTerakhir.sawahKondisi = sawahKondisi;
-  }
-
-  // --- CEK KETINGGIAN TAMBAK ---
-  let tambakKondisi;
-  if (d.tambak <= MIN_AIR_TAMBAK) tambakKondisi = "rendah";
-  else if (d.tambak >= MAX_AIR_TAMBAK) tambakKondisi = "penuh";
-  else tambakKondisi = "normal";
-
-  if (tambakKondisi !== statusTerakhir.tambakKondisi) {
-    if (tambakKondisi === "rendah") {
-      showToast("Air Tandon Rendah", `Ketinggian tandon ${d.tambak.toFixed(1)} cm di bawah batas minimum (${MIN_AIR_TAMBAK} cm). Pompa 1 dinonaktifkan (safety interlock).`, "danger", "fa-circle-exclamation");
-    } else if (tambakKondisi === "penuh") {
-      showToast("Tandon Penuh", `Ketinggian tandon ${d.tambak.toFixed(1)} cm mencapai batas maksimum (${MAX_AIR_TAMBAK} cm). Saluran pembuangan dibuka.`, "warning", "fa-door-open");
-    } else if (statusTerakhir.tambakKondisi !== null) {
-      showToast("Tandon Normal", `Ketinggian tandon ${d.tambak.toFixed(1)} cm kembali pada kondisi normal.`, "success", "fa-circle-check");
-    }
-    statusTerakhir.tambakKondisi = tambakKondisi;
-  }
-
-  // --- CEK KELEMBABAN TANAH ---
-  let soilKondisi = d.soil < 80 ? "kering" : "cukup";
-  if (soilKondisi !== statusTerakhir.soilKondisi) {
-    if (soilKondisi === "kering") {
-      showToast("Tanah Belum Lembab", `Kelembaban tanah ${d.soil}% di bawah ambang 80%. Pompa irigasi aktif.`, "warning", "fa-seedling");
-    } else {
-      showToast("Kelembaban Tanah Cukup", `Kelembaban tanah ${d.soil}% sudah memenuhi ambang kebutuhan.`, "success", "fa-circle-check");
-    }
-    statusTerakhir.soilKondisi = soilKondisi;
-  }
-}
-
-// ==========================================
-// 5. KONEKSI & PENANGANAN PESAN MQTT
-// ==========================================
-client.on("connect", () => {
-  document.getElementById("conn-status").className = "status-badge";
-  document.getElementById("status-text").innerText = "TERHUBUNG";
-  client.subscribe("sawah/data"); 
-  client.subscribe("sistem/mode"); 
-  client.subscribe("sistem/setting_tinggi");
-});
-
-client.on("error", () => {
-  document.getElementById("conn-status").className = "status-badge offline";
-  document.getElementById("status-text").innerText = "KONEKSI TERPUTUS";
-});
-
-client.on("message", (topic, message) => {
-  let msg = message.toString();
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Monitoring Sawah by ARNF</title>
   
-  if (topic === "sistem/mode") updateButtonUI('mode', msg === "AUTO" ? 'btn-auto' : 'btn-manual');
+  <!-- Font & Icon -->
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   
-  if (topic === "sistem/setting_tinggi") {
-    targetSawahAktif = parseFloat(msg);
-    document.getElementById("target-status").innerText = msg;
-    document.getElementById("settingSlider").value = msg; // Sinkronisasi posisi slider via MQTT
-    document.getElementById("sliderValue").innerText = msg;
-    localStorage.setItem("targetSawahTerakhir", msg);
-  }
+  <!-- Library Pendukung -->
+  <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.0"></script>
   
-  if (topic === "sawah/data") {
-    try {
-      let d = JSON.parse(msg);
-      cekNotifikasiThreshold(d);
-      const timeNow = new Date().toLocaleTimeString('id-ID', { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+  <style>
+    :root {
+      --bg-main: #0a192f; 
+      --glass-bg: rgba(255, 255, 255, 0.05); 
+      --glass-border: rgba(255, 255, 255, 0.1);
+      --text-main: #e2e8f0; 
+      --text-muted: #94a3b8; 
+      --accent-yellow: #fbbf24;
+      --accent-blue: #3b82f6; 
+      --status-on: #10b981; 
+      --status-off: #ef4444;
+    }
+    
+    * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Poppins', sans-serif; }
+    body { background: radial-gradient(circle at top right, #112240, var(--bg-main)); color: var(--text-main); min-height: 100vh; padding: 20px; }
 
-      if (d.soil !== undefined) document.getElementById("soil").innerText = d.soil + " %";
-      if (d.sawah !== undefined) document.getElementById("sawah").innerText = d.sawah.toFixed(1) + " cm";
-      if (d.tambak !== undefined) document.getElementById("tambak").innerText = d.tambak.toFixed(1) + " cm";
-      if (d.voltage !== undefined) document.getElementById("battery").innerText = d.voltage.toFixed(1) + " V";
+    /* HEADER */
+    header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; padding-bottom: 15px; border-bottom: 1px solid var(--glass-border); flex-wrap: wrap; gap: 15px; }
+    .title-wrapper h1 { font-size: 24px; color: var(--accent-yellow); font-weight: 700; }
+    .title-wrapper i { color: #10b981; margin-right: 8px; }
+    .status-badge { background: rgba(16, 185, 129, 0.2); color: #10b981; padding: 8px 16px; border-radius: 20px; font-size: 14px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+    .status-badge.offline { background: rgba(239, 68, 68, 0.2); color: #ef4444; }
+    .nav-btn { background: rgba(255,255,255,0.1); color: white; padding: 8px 15px; border-radius: 8px; text-decoration: none; font-size: 14px; transition: 0.3s; }
+    .nav-btn:hover { background: rgba(255,255,255,0.2); }
 
-      updateButtonUI('p1', d.pompa1 === "ON" ? 'btn-p1-on' : 'btn-p1-off');
-      updateButtonUI('p2', d.pompa2 === "ON" ? 'btn-p2-on' : 'btn-p2-off');
-      updateButtonUI('akt', d.aktuator === "BUKA" ? 'btn-akt-buka' : 'btn-akt-tutup');
+    /* GLASS CARD */
+    .glass-card { background: var(--glass-bg); backdrop-filter: blur(10px); border: 1px solid var(--glass-border); border-radius: 16px; padding: 20px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); }
+    
+    /* GRID SENSOR */
+    .dashboard-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 20px; margin-bottom: 20px; }
+    .sensor-card { text-align: center; }
+    .sensor-title { font-size: 14px; color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 15px; }
+    .sensor-icon { font-size: 40px; margin-bottom: 10px; color: var(--accent-blue); }
+    .sensor-icon.soil { color: #10b981; } .sensor-icon.batt { color: var(--accent-yellow); }
+    .sensor-value { font-size: 36px; font-weight: 700; color: var(--accent-yellow); }
 
-      if (d.durP1 !== undefined) document.getElementById("durasi-p1").innerText = formatKeWaktu(d.durP1);
-      if (d.durP2 !== undefined) document.getElementById("durasi-p2").innerText = formatKeWaktu(d.durP2);
-      if (d.durAkt !== undefined) document.getElementById("durasi-akt").innerText = formatKeWaktu(d.durAkt); 
+    /* KONTROL MANUAL & DURASI */
+    .control-grid { display: grid; grid-template-columns: 1fr 1fr 2fr; gap: 20px; margin-bottom: 20px; }
+    @media (max-width: 1024px) { .control-grid { grid-template-columns: 1fr; } }
+    .control-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+    .control-row span { font-size: 14px; font-weight: 600; }
+    
+    /* TOMBOL KONTROL */
+    .btn-group { display: flex; gap: 5px; }
+    button { border: none; padding: 8px 15px; border-radius: 8px; font-weight: 600; cursor: pointer; transition: 0.3s; background: rgba(255, 255, 255, 0.1); color: var(--text-main); }
+    button:hover { background: rgba(255, 255, 255, 0.2); }
+    button.active-on { background: var(--status-on) !important; color: white !important; box-shadow: 0 0 10px rgba(16, 185, 129, 0.4); }
+    button.active-off { background: var(--status-off) !important; color: white !important; box-shadow: 0 0 10px rgba(239, 68, 68, 0.4); }
 
-      if (d.soil !== undefined) updateChartData(soilChart, d.soil, timeNow);
-      if (d.sawah !== undefined) updateChartData(sawahChart, d.sawah, timeNow);
-      if (d.tambak !== undefined) updateChartData(tambakChart, d.tambak, timeNow);
-    } catch (e) {}
-  }
-});
+    /* SLIDER & TARGET */
+    .slider-container { margin: 25px 0; display: flex; align-items: center; gap: 15px; }
+    input[type=range] { flex: 1; accent-color: var(--accent-yellow); cursor: pointer; }
+    .target-val { font-size: 24px; font-weight: bold; color: var(--accent-yellow); min-width: 80px; text-align: right; }
+    .btn-kirim { background: var(--accent-blue); color: white; padding: 10px 20px; font-size: 16px; width: 100%; margin-top: 10px; }
+    .btn-kirim:hover { background: #2563eb; }
 
-// ==========================================
-// 6. FUNGSI PENGIRIMAN PERINTAH KE ESP32
-// ==========================================
-window.setMode = (m) => client.publish("sistem/mode", m);
-window.sendManual = (d, s) => client.publish("manual/" + d, s);
+    /* GRAFIK */
+    .chart-section { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; }
+    .chart-box { height: 250px; cursor: ew-resize; }
+    .section-title { font-size: 16px; font-weight: 600; color: var(--accent-yellow); margin-bottom: 15px; display: flex; align-items: center; gap: 10px; }
+    .device-val { font-family: monospace; font-size: 14px; color: var(--accent-yellow); background: rgba(0,0,0,0.3); padding: 4px 10px; border-radius: 6px; }
 
-window.setSetting = () => {
-  const sliderValue = document.getElementById("settingSlider").value;
-  targetSawahAktif = parseFloat(sliderValue);
-  client.publish("sistem/setting_tinggi", sliderValue);
-  
-  // Tampilkan Instan di Layar
-  document.getElementById("target-status").innerText = sliderValue;
-  document.getElementById("settingSlider").value = sliderValue; // Pastikan posisi terkunci
-  
-  // Simpan secara permanen ke memori lokal
-  localStorage.setItem("targetSawahTerakhir", sliderValue);
-};
+    /* NOTIFIKASI TOAST */
+    #notif-container { position: fixed; top: 20px; right: 20px; z-index: 999; display: flex; flex-direction: column; gap: 10px; max-width: 350px; }
+    .toast {
+      background: rgba(17, 34, 64, 0.95); backdrop-filter: blur(10px); border: 1px solid var(--glass-border);
+      border-left: 4px solid var(--accent-blue); border-radius: 10px; padding: 14px 16px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.4); animation: slideIn 0.3s ease-out;
+      display: flex; align-items: flex-start; gap: 10px; font-size: 13px;
+    }
+    .toast.success { border-left-color: var(--status-on); }
+    .toast.warning { border-left-color: var(--accent-yellow); }
+    .toast.danger { border-left-color: var(--status-off); }
+    .toast i { font-size: 18px; margin-top: 2px; }
+    .toast.success i { color: var(--status-on); }
+    .toast.warning i { color: var(--accent-yellow); }
+    .toast.danger i { color: var(--status-off); }
+    .toast .toast-text strong { display: block; margin-bottom: 2px; color: white; }
+    @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+    @keyframes fadeOut { from { opacity: 1; } to { opacity: 0; } }
+    @media (max-width: 500px) { #notif-container { left: 10px; right: 10px; max-width: none; } }
+  </style>
+</head>
+<body>
 
-ambilDataAwalDariFirebase();
+  <!-- NOTIFIKASI THRESHOLD -->
+  <div id="notif-container"></div>
+
+  <!-- TOMBOL TES NOTIFIKASI (Hanya untuk debugging, aman dihapus nanti) -->
+  <div style="position: fixed; bottom: 15px; right: 15px; z-index: 998;">
+    <button onclick="document.getElementById('test-panel').style.display = document.getElementById('test-panel').style.display === 'none' ? 'flex' : 'none';" 
+      style="background: rgba(255,255,255,0.1); border-radius: 50%; width: 45px; height: 45px; font-size: 16px;">
+      <i class="fa-solid fa-vial"></i>
+    </button>
+    <div id="test-panel" style="display:none; flex-direction: column; gap: 8px; position: absolute; bottom: 55px; right: 0; background: rgba(17,34,64,0.95); backdrop-filter: blur(10px); border: 1px solid var(--glass-border); border-radius: 12px; padding: 12px; width: 220px;">
+      <strong style="font-size: 12px; color: var(--text-muted);">TES NOTIFIKASI (Broadcast)</strong>
+      <button onclick="kirimTesNotifikasi('normal')" style="font-size:12px; text-align:left;">✅ Kondisi Normal</button>
+      <button onclick="kirimTesNotifikasi('kurang')" style="font-size:12px; text-align:left;">⚠️ Sawah Kurang Air</button>
+      <button onclick="kirimTesNotifikasi('lebih')" style="font-size:12px; text-align:left;">⚠️ Sawah Kelebihan Air</button>
+      <button onclick="kirimTesNotifikasi('tandon_rendah')" style="font-size:12px; text-align:left;">🚨 Tandon Rendah</button>
+      <button onclick="kirimTesNotifikasi('tandon_penuh')" style="font-size:12px; text-align:left;">⚠️ Tandon Penuh</button>
+      <button onclick="kirimTesNotifikasi('tanah_kering')" style="font-size:12px; text-align:left;">⚠️ Tanah Kering</button>
+    </div>
+  </div>
+
+  <!-- HEADER -->
+  <header>
+    <div class="title-wrapper">
+      <h1><i class="fa-solid fa-wheat-awn"></i> Monitoring Sawah by ARNF</h1>
+    </div>
+    <div style="display: flex; gap: 15px; align-items: center;">
+      <a href="riwayat.html" class="nav-btn"><i class="fa-solid fa-table"></i> Database & Export</a>
+      <div class="status-badge offline" id="conn-status">
+        <i class="fa-solid fa-wifi"></i> <span id="status-text">Menghubungkan...</span>
+      </div>
+      <button id="btn-notif-permission" onclick="mintaIzinNotifikasi()" class="nav-btn" style="display:none;">
+        <i class="fa-solid fa-bell"></i> Aktifkan Notifikasi HP
+      </button>
+    </div>
+  </header>
+
+  <!-- NILAI SENSOR -->
+  <div class="dashboard-grid">
+    <div class="glass-card sensor-card">
+      <div class="sensor-title">Kelembapan Tanah</div>
+      <div class="sensor-icon soil"><i class="fa-solid fa-droplet"></i></div>
+      <div class="sensor-value" id="soil">-- %</div>
+    </div>
+    <div class="glass-card sensor-card">
+      <div class="sensor-title">Tinggi Sawah</div>
+      <div class="sensor-icon"><i class="fa-solid fa-water"></i></div>
+      <div class="sensor-value" id="sawah">-- cm</div>
+    </div>
+    <div class="glass-card sensor-card">
+      <div class="sensor-title">Tinggi Tandon</div>
+      <div class="sensor-icon"><i class="fa-solid fa-water"></i></div>
+      <div class="sensor-value" id="tambak">-- cm</div>
+    </div>
+    <div class="glass-card sensor-card">
+      <div class="sensor-title">Tegangan Sistem</div>
+      <div class="sensor-icon batt"><i class="fa-solid fa-bolt"></i></div>
+      <div class="sensor-value" id="battery">-- V</div>
+    </div>
+  </div>
+
+  <!-- KONTROL, DURASI, & TARGET -->
+  <div class="control-grid">
+    
+    <!-- KONTROL MANUAL -->
+    <div class="glass-card">
+      <div class="section-title"><i class="fa-solid fa-sliders"></i> Kontrol Manual</div>
+      <div class="control-row" style="border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom:15px; margin-bottom:15px;">
+        <span style="color: var(--accent-yellow);">Mode Sistem</span>
+        <div class="btn-group">
+          <button id="btn-auto" onclick="setMode('AUTO')">AUTO</button>
+          <button id="btn-manual" onclick="setMode('MANUAL')">MANUAL</button>
+        </div>
+      </div>
+      <div class="control-row">
+        <span><i class="fa-solid fa-pump-water" style="color:#3b82f6;"></i> Pompa 1</span>
+        <div class="btn-group">
+          <button id="btn-p1-on" onclick="sendManual('pompa1', 'ON')">ON</button>
+          <button id="btn-p1-off" onclick="sendManual('pompa1', 'OFF')">OFF</button>
+        </div>
+      </div>
+      <div class="control-row">
+        <span><i class="fa-solid fa-pump-water" style="color:#3b82f6;"></i> Pompa 2</span>
+        <div class="btn-group">
+          <button id="btn-p2-on" onclick="sendManual('pompa2', 'ON')">ON</button>
+          <button id="btn-p2-off" onclick="sendManual('pompa2', 'OFF')">OFF</button>
+        </div>
+      </div>
+      <div class="control-row">
+        <span><i class="fa-solid fa-door-open" style="color:#fbbf24;"></i> Saluran (Akt)</span>
+        <div class="btn-group">
+          <button id="btn-akt-buka" onclick="sendManual('aktuator', 'BUKA')">OPEN</button>
+          <button id="btn-akt-tutup" onclick="sendManual('aktuator', 'TUTUP')">CLOSE</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- STATISTIK HARIAN -->
+    <div class="glass-card">
+      <div class="section-title"><i class="fa-solid fa-hourglass-half"></i> Info Harian Alat</div>
+      <p style="font-size: 11px; color: var(--text-muted); margin-bottom: 15px;">*Waktu & saluran otomatis direset jam 00:00</p>
+      
+      <div class="control-row"><span>Durasi Pompa 1</span><span id="durasi-p1" class="device-val" style="color:#3b82f6;">00:00:00</span></div>
+      <div class="control-row"><span>Durasi Pompa 2</span><span id="durasi-p2" class="device-val" style="color:#3b82f6;">00:00:00</span></div>
+      <div class="control-row"><span>Waktu Terbuka (Slr)</span><span id="durasi-akt" class="device-val" style="color:#10b981;">00:00:00</span></div>
+      <div class="control-row"><span>Saluran Buka</span><span id="cnt-buka" class="device-val" style="color:#fbbf24;">0 Kali</span></div>
+      <div class="control-row" style="margin-bottom:0;"><span>Saluran Tutup</span><span id="cnt-tutup" class="device-val" style="color:#ef4444;">0 Kali</span></div>
+    </div>
+
+    <!-- TARGET TINGGI SAWAH -->
+    <div class="glass-card">
+      <div class="section-title"><i class="fa-solid fa-bullseye"></i> Target Tinggi Sawah</div>
+      <p style="color: var(--text-muted); font-size: 13px;">Geser batas ketinggian air sawah. Mode AUTO akan mempertahankan air di angka ini.</p>
+      
+      <div class="slider-container">
+        <span style="font-size: 14px;">0 cm</span>
+        <input type="range" id="settingSlider" min="0" max="30" value="14" step="0.5" oninput="updateSliderValue(this.value)">
+        <span style="font-size: 14px;">30 cm</span>
+      </div>
+      
+      <div style="text-align: center; margin-bottom: 15px;">
+        <span class="target-val"><span id="sliderValue">14</span> cm</span>
+      </div>
+      
+      <button class="btn-kirim" onclick="setSetting()">KIRIM TARGET</button>
+      <p style="text-align: center; margin-top: 15px; font-size: 13px;">Target Tersimpan: <strong id="target-status" style="color:var(--accent-yellow);">14</strong> cm</p>
+    </div>
+
+  </div>
+
+  <!-- GRAFIK PEMANTAUAN -->
+  <div class="glass-card" style="margin-bottom: 30px;">
+    <div class="section-title" style="justify-content: space-between;">
+      <span><i class="fa-solid fa-chart-line"></i> Tren Pemantauan Data</span>
+      <span style="font-size: 11px; color: var(--text-muted); font-weight: normal;"><i class="fa-solid fa-hand-pointer"></i> Geser / Scroll grafik untuk Zoom</span>
+    </div>
+    
+    <div class="chart-section">
+      <div class="chart-box"><canvas id="soilChart"></canvas></div>
+      <div class="chart-box"><canvas id="sawahChart"></canvas></div>
+      <div class="chart-box"><canvas id="tambakChart"></canvas></div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
