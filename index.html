@@ -111,12 +111,15 @@
     </button>
     <div id="test-panel" style="display:none; flex-direction: column; gap: 8px; position: absolute; bottom: 55px; right: 0; background: rgba(17,34,64,0.95); backdrop-filter: blur(10px); border: 1px solid var(--glass-border); border-radius: 12px; padding: 12px; width: 220px;">
       <strong style="font-size: 12px; color: var(--text-muted);">TES NOTIFIKASI (Broadcast)</strong>
-      <button onclick="kirimTesNotifikasi('normal')" style="font-size:12px; text-align:left;">✅ Kondisi Normal</button>
-      <button onclick="kirimTesNotifikasi('kurang')" style="font-size:12px; text-align:left;">⚠️ Sawah Kurang Air</button>
+      <button onclick="kirimTesNotifikasi('normal')" style="font-size:12px; text-align:left;">✅ Semua Normal/Sesuai</button>
+      <button onclick="kirimTesNotifikasi('kurang')" style="font-size:12px; text-align:left;">⚠️ Sawah Kekurangan Air</button>
       <button onclick="kirimTesNotifikasi('lebih')" style="font-size:12px; text-align:left;">⚠️ Sawah Kelebihan Air</button>
-      <button onclick="kirimTesNotifikasi('tandon_rendah')" style="font-size:12px; text-align:left;">🚨 Tandon Rendah</button>
-      <button onclick="kirimTesNotifikasi('tandon_penuh')" style="font-size:12px; text-align:left;">⚠️ Tandon Penuh</button>
-      <button onclick="kirimTesNotifikasi('tanah_kering')" style="font-size:12px; text-align:left;">⚠️ Tanah Kering</button>
+      <button onclick="kirimTesNotifikasi('tandon_rendah')" style="font-size:12px; text-align:left;">🚨 Tandon Tinggal Sedikit</button>
+      <button onclick="kirimTesNotifikasi('tandon_penuh')" style="font-size:12px; text-align:left;">⚠️ Tandon Kelebihan Air</button>
+      <button onclick="kirimTesNotifikasi('tanah_kering')" style="font-size:12px; text-align:left;">🌱 Tanah Kering</button>
+      <button onclick="kirimTesNotifikasi('tanah_basah')" style="font-size:12px; text-align:left;">💧 Tanah Sudah Basah</button>
+      <button onclick="kirimTesNotifikasi('baterai_habis')" style="font-size:12px; text-align:left;">🔋 Baterai Akan Habis</button>
+      <button onclick="kirimTesNotifikasi('aktuator_buka')" style="font-size:12px; text-align:left;">🚪 Aktuator Terbuka</button>
     </div>
   </div>
 
